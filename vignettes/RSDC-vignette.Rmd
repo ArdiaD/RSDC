@@ -54,7 +54,7 @@ depends on a discrete state $S_t$. The correlation is constant within a
 regime but different across regimes, and transitions between regimes are
 governed by a Markov chain. This regime-switching framework can capture
 sudden shifts in correlation structure (for example, moving from a
-low-correlation “normal” market regime to a high-correlation “crisis”
+low-correlation \`normal' market regime to a high-correlation \`crisis'
 regime) better than smoothly changing models.
 
 This R package `RSDC` implements @pelletier2006regime’s RSDC model and
@@ -70,7 +70,7 @@ can increase or decrease as a function of external variables (for
 example, a high climate-risk indicator might increase the probability of
 switching into a “crisis” correlation regime).
 
-The package provides three flavors of correlation models:
+The package provides three types of correlation models:
 
 -   **Constant Correlation (Single Regime)** – a baseline with no regime
     switching (all data share one static correlation matrix).
@@ -204,8 +204,11 @@ $$
 \end{pmatrix}.
 $$
 
-Thus: - $\pi_{12}(t) = 1 - \pi_{11}(t)$ -
-$\pi_{21}(t) = 1 - \pi_{22}(t)$
+Thus:
+
+-   $\pi_{12}(t) = 1 - \pi_{11}(t)$
+
+-   $\pi_{21}(t) = 1 - \pi_{22}(t)$
 
 This formulation is aligned with the approach of time-varying Markov
 switching models such as those discussed in @pelletier2006regime,
@@ -307,7 +310,7 @@ intensive on large datasets.
 
 ### Model Variants
 
-#### 1. Constant Correlation Model (`method = "const"`)
+#### 1. Constant Correlation Model (`` method = `const' ``)
 
 This is a special case where $N = 1$, i.e., no switching. We estimate a
 single correlation matrix $R_1$ over the full sample. This corresponds
@@ -315,7 +318,7 @@ to a **constant conditional correlation** model. The log-likelihood has
 a closed-form (but we still use an optimizer for flexibility). This
 model serves as a **baseline**.
 
-#### 2. Regime-Switching with Fixed Transitions (`method = "noX"`)
+#### 2. Regime-Switching with Fixed Transitions (`` method = `noX' ``)
 
 In this case, $N \ge 2$ and the transition matrix $P$ is time-invariant.
 
@@ -330,7 +333,7 @@ Bounds are set to $[0.01, 0.99]$ to avoid degenerate regimes. This
 model, inspired by @pelletier2006regime, captures regime shifts
 **without** exogenous information.
 
-#### 3. Regime-Switching with Time-Varying Transitions (`method = "tvtp"`)
+#### 3. Regime-Switching with Time-Varying Transitions (`` method = `tvtp' ``)
 
 This is the **extended model**. It uses exogenous covariates
 $X \in \mathbb{R}^{T \times p}$ to drive time-varying transitions.
@@ -369,7 +372,7 @@ variables contain relevant regime-switching signals.
 ## Simulation Example
 
 To illustrate how the package works, let’s create a simple synthetic
-example. We will simulate data from a 2-regime correlation model with
+example. We simulate data from a 2-regime correlation model with
 time-varying transition probabilities that depend on a single exogenous
 variable. We’ll then fit various models to this data and compare the
 results.
@@ -379,13 +382,13 @@ results.
 Suppose we have $K=2$ assets and $N=2$ regimes. We’ll design regime 1 to
 have a high correlation between the two assets, and regime 2 to have low
 correlation. Specifically, let the true correlation in regime 1 be $0.8$
-and in regime 2 be $0.0$ (uncorrelated). Both regimes will have zero
-mean and unit variances for simplicity.
+and in regime 2 be $-0.6$. Both regimes have zero mean and unit
+variances for simplicity.
 
 We introduce an exogenous variable $x_t$ that influences the switching:
-when $x_t$ is high (positive), the process will tend to stay or move
-into regime 1; when $x_t$ is low (negative), it will favor regime 2. We
-achieve this by setting the logistic coefficients as follows:
+when $x_t$ is high (positive), the process tends to stay or move into
+regime 1; when $x_t$ is low (negative), it favors regime 2. We achieve
+this by setting the logistic coefficients as follows:
 
 -   For regime 1:\
     $\beta_1 = (a_0, a_1) = (1.0,\; +2.0)$\
@@ -411,9 +414,9 @@ In summary, $x_t$ can be thought of as a regime-driving factor: high
 values of $x_t$ promote the high-correlation regime 1, and low values
 promote the low-correlation regime 2.
 
-For our simulation, we’ll generate $x_t$ as a smooth sinusoidal sequence
-to mimic an oscillating environment (so that the process will switch
-regimes a few times as $x_t$ rises and falls).
+For our simulation, we generate $x_t$ as a smooth sinusoidal sequence to
+mimic an oscillating environment (so that the process switches regimes a
+few times as $x_t$ rises and falls).
 
 Using the function `f_simul_tvtp()` from our package, we simulate
 $T=500$ observations. Here’s the R code to perform the simulation:
@@ -471,9 +474,9 @@ covariance matrices, but since we set unit variances, these are
 effectively correlation matrices for each regime.
 
 Now, let’s verify the simulation qualitatively. We expect that when
-`exog_var` is high (around +1), the system will mostly be in regime 1
-(high correlation), and when `exog_var` is low (around -1), it will be
-in regime 2. Indeed, we can check a few points:
+`exog_var` is high (around +1), the system is mostly in regime 1 (high
+correlation), and when `exog_var` is low (around -1), it is in regime 2.
+Indeed, we can check a few points:
 
 ```{r, head data}
 # Quick check of states vs exogenous variable 
@@ -493,18 +496,18 @@ corresponds to the half-cycles of the sine wave. This confirms that the
 simulation behaved as designed: the exogenous variable influences the
 regime dwelling times.
 
-**Fitting the models:** Now suppose we as analysts observe only the
+**Fitting the models:** Now, we as analysts, observe only the
 `sim_data$observations` and the exogenous series `X`, and we want to fit
 our models to this data.
 
-We will fit three models:
+We fit three models:
 
 1\. A constant correlation model,
 
 2\. A 2-regime model with fixed transition probabilities,
 
 3\. A 2-regime model with TVTP using our provided `X`. We use the
-wrapper function `estimate_model()` for convenience (it will call the
+wrapper function `estimate_model()` for convenience (it calls the
 appropriate internal optimization routine for each case):
 
 ```{r, fit models}
@@ -526,16 +529,15 @@ fit_tvtp <- estimate_model(method = "tvtp",
                            control = list(do_trace = FALSE))
 ```
 
-Each of these will return a list of estimated parameters and some
-diagnostics. Notably, `fit_tvtp` will contain `fit_tvtp$beta` (the
-estimated $2\times p$ matrix of logistic coefficients),
-`fit_tvtp$correlations` (an $N \times C$ matrix of estimated correlation
-parameters, where $C = K(K-1)/2$ is the number of unique pairwise
-correlations – here $C=1$ since $K=2$), and `fit_tvtp$log_likelihood`.
-Similarly, `fit_noX$transition_matrix` would give the estimated $P$
-matrix for the Markov chain, and `fit_const$correlations` gives the
-single regime’s correlation estimate. Let’s inspect some results
-(rounded for clarity):
+Each of these return a list of estimated parameters and some
+diagnostics. Notably, `fit_tvtp` contains `fit_tvtp$beta` (the estimated
+$2\times p$ matrix of logistic coefficients), `fit_tvtp$correlations`
+(an $N \times C$ matrix of estimated correlation parameters, where
+$C = K(K-1)/2$ is the number of unique pairwise correlations – here
+$C=1$ since $K=2$), and `fit_tvtp$log_likelihood`. Similarly,
+`fit_noX$transition_matrix` gives the estimated $P$ matrix for the
+Markov chain, and `fit_const$correlations` gives the single regime’s
+correlation estimate. Let’s inspect some results (rounded for clarity):
 
 ```{r, inspect results}
 # Extract estimated correlation in each regime: 
@@ -608,18 +610,23 @@ correlation matrices by the probability of being in each regime at that
 time. Formally, if $\hat{\xi}_{j,t}$ is the probability of regime $j$ at
 $t$ (we use smoothed probabilities by default), and $r_j$ is the vector
 of pairwise correlations in regime $j$, then the predicted correlation
-vector is $\hat{r}_t = \sum_{j=1}^N \hat{\xi}_{j,t} \, r_j.$ This can be
-turned into a full predicted correlation matrix $\hat{R}_t$. If we also
-have forecasts of individual asset volatilities $\sigma_{k,t}$ (e.g.
-from GARCH models), we can then build the full covariance matrix
-forecast as $\hat{\Sigma}_t = D_t \hat{R}_t D_t$, where
-$D_t = \mathrm{diag}(\sigma_{1,t},...,\sigma_{K,t})$.
+vector is:
 
-In our simulation example, we assumed unit variances throughout, so we
-don’t need an external volatility forecast. We can just use the model’s
-correlation predictions directly. The code below shows how to get the
-predicted correlations and covariances for our simulated data using the
-fitted TVTP model:
+$$
+\hat{r}_t = \sum_{j=1}^N \hat{\xi}_{j,t}\cdot r_j.
+$$
+
+This can be turned into a full predicted correlation matrix $\hat{R}_t$.
+If we also have forecasts of individual asset volatilities
+$\sigma_{k,t}$ (e.g. from GARCH models), we can then build the full
+covariance matrix forecast as $\hat{\Sigma}_t = D_t \hat{R}_t D_t$,
+where $D_t = \mathrm{diag}(\sigma_{1,t},...,\sigma_{K,t})$.
+
+In our simulation example, we assume unit variances, so we don’t need an
+external volatility forecast. We can just use the model’s correlation
+predictions directly. The code below shows how to get the predicted
+correlations and covariances for our simulated data using the fitted
+TVTP model:
 
 ```{r, forecast}
 forecast <- f_forecast_cov(method = "tvtp", 
@@ -640,10 +647,10 @@ matrix of the predicted pairwise correlations at each time $t$) and
 matrix at each $t$). In our case with $K=2$, `predicted_correlations`
 has just one column (the correlation between asset 1 and 2). We could
 plot this over time to see how the model’s predicted correlation varied.
-It should hover near 0.8 in the periods we know Regime 1 was likely, and
-near -0.6 in the other periods, with smooth transitions during uncertain
-times. In other words, it tracks the true correlation regime fairly
-well.
+It should hover near 0.8 in the periods we know the high correlation
+regime is likely, and near -0.6 in the other periods, with smooth
+transitions during uncertain times. In other words, it tracks the true
+correlation regime fairly well.
 
 The `f_forecast_cov` function also returns the smoothed probabilities.
 We can plot it to ensure the probabilities oscillate like the sin wave
@@ -661,7 +668,7 @@ Finally, the `f_forecast_cov` function computes the BIC (for the model
 used) and, if `out_of_sample=TRUE` was specified, it would handle
 splitting the data so that only the latter portion is used for
 forecasting (using parameters and smoothed probabilities estimated on
-the first portion). In our example, we kept `out_of_sample=FALSE` to use
+the first portion). In our example, we keet `out_of_sample=FALSE` to use
 the full series for illustration.
 
 **Portfolio Allocation:** A primary motivation for modeling correlations
@@ -730,20 +737,20 @@ symmetry.
 In a more general scenario with differing volatilities, correlation
 structures, or more assets, these weights would vary over time. For
 example, if one asset becomes extremely correlated with others, the
-max-diversification portfolio will reduce its weight to maintain a high
+max-diversification portfolio would reduce its weight to maintain a high
 diversification ratio; the min-variance portfolio would also re-balance
 away from highly correlated assets if others provide a diversification
 benefit. **(See potential paper with green vs brown or Fatma data).**
 
 The `rebalance` argument in `f_maxdiv` (and similarly in `f_minvar`)
-**does not control how often the portfolio weights are recalculated**.
-Weights are computed at **every time step**, using the forecasted
+does not control how often the portfolio weights are recalculated.
+Weights are computed at every time step, using the forecasted
 volatilities and correlations available at each date. Instead, the
-`rebalance` parameter is used **only to determine the scaling factor**
-for annualizing the reported volatility statistic. Specifically,
-`"daily"` assumes 252 trading days per year, `"monthly"` assumes 12, and
-so on. If `"custom"` is specified, the function uses the number of
-unique months in the `dates` vector to estimate the frequency.
+`rebalance` parameter is used only to determine the scaling factor for
+annualizing the reported volatility statistic. Specifically, `"daily"`
+assumes 252 trading days per year, `"monthly"` assumes 12, and so on. If
+`"custom"` is specified, the function uses the number of unique months
+in the `dates` vector to estimate the frequency.
 
 This choice affects only the scaling of the volatility reported in the
 output (`$volatility`), not the portfolio construction logic or timing.
@@ -752,8 +759,8 @@ updates to weights) must manually subsample or filter their input
 matrices before passing them to the function.
 
 The portfolio functions also return some performance metrics. For
-instance, `port_minvar$volatility` gives the **realized volatility** of
-the min-var portfolio (annualized based on the chosen rebalancing
+instance, `port_minvar$volatility` gives the realized volatility of the
+min-var portfolio (annualized based on the chosen rebalancing
 frequency). `port_maxdiv$diversification_ratios` gives the time series
 of realized diversification ratio achieved, and
 `port_maxdiv$mean_diversification` its average.
