@@ -186,7 +186,7 @@ f_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
     div_obj <- function(w) {
       port_vol <- sqrt(t(w) %*% cov_t %*% w)
       weighted_avg_vol <- sum(w * vol_vec)
-      -weighted_avg_vol / port_vol
+      - weighted_avg_vol / port_vol
     }
 
     tryCatch({
