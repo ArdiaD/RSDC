@@ -84,7 +84,7 @@ The package provides three types of correlation models:
     probabilities are dynamic functions of exogenous variables.
 
 In all cases, we assume the input data are *standardized residuals*
-(e.g. returns scaled by their own volatility). In practice, you might
+(e.g. returns scaled by their own volatility). In practice, one might
 first fit univariate GARCH models to each series to filter out
 volatility, and then feed the resulting standardized returns (with unit
 variance) into these correlation models. This way, the regime effects
@@ -352,7 +352,7 @@ $$
 In this setting, regime durations are influenced by observed variables
 (e.g., financial stress, news sentiment, etc.).
 
-> **Note:** You must explicitly include an intercept in $X$ if desired
+> **Note:** Users must explicitly include an intercept in $X$ if desired
 > (e.g., a column of 1s). The package does **not** add one
 > automatically.
 
