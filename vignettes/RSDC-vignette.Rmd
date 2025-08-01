@@ -456,7 +456,7 @@ sigma_array[, , 2] <- R2
 mu_matrix <- matrix(0, nrow = N, ncol = K) 
 
 # Simulate the process 
-sim_data <- f_simul_tvtp(n = T, 
+sim_data <- rsdc_simulate(n = T, 
                          X = X, 
                          beta = beta_array, 
                          mu = mu_matrix, 
@@ -507,22 +507,22 @@ We fit three models:
 2\. A 2-regime model with fixed transition probabilities,
 
 3\. A 2-regime model with TVTP using our provided `X`. We use the
-wrapper function `estimate_model()` for convenience (it calls the
+wrapper function `rsdc_estimate()` for convenience (it calls the
 appropriate internal optimization routine for each case):
 
 ```{r, fit models}
 residuals <- sim_data$observations # our data matrix 
 # 1. Constant correlation (no regimes) 
-fit_const <- estimate_model(method = "const", 
+fit_const <- rsdc_estimate(method = "const", 
                             residuals = residuals, 
                             control = list(do_trace = FALSE))
 # 2. Regime-switching with no exogenous variables (fixed P) 
-fit_noX <- estimate_model(method = "noX", 
+fit_noX <- rsdc_estimate(method = "noX", 
                           residuals = residuals, 
                           N = 2, 
                           control = list(do_trace = FALSE))
 # 3. Regime-switching with time-varying transition probabilities 
-fit_tvtp <- estimate_model(method = "tvtp", 
+fit_tvtp <- rsdc_estimate(method = "tvtp", 
                            residuals = residuals, 
                            N = 2, 
                            X = X, 
@@ -629,7 +629,7 @@ correlations and covariances for our simulated data using the fitted
 TVTP model:
 
 ```{r, forecast}
-forecast <- f_forecast_cov(method = "tvtp", 
+forecast <- rsdc_forecast(method = "tvtp", 
                            N = 2, 
                            residuals = residuals, 
                            X = X, 
@@ -710,13 +710,13 @@ still demonstrate the usage:
 
 ```{r, build pfs}
 # Compute dynamic minimum-variance and max-diversification weights 
-port_minvar <- f_minvar(sigma_matrix = forecast$sigma_matrix, 
+port_minvar <- rsdc_minvar(sigma_matrix = forecast$sigma_matrix, 
                         value_cols = 1:K, 
                         predicted_corr = forecast$predicted_correlations, 
                         y = residuals, 
                         rebalance = c("daily"),
                         long_only = TRUE)
-port_maxdiv <- f_maxdiv(sigma_matrix = forecast$sigma_matrix, 
+port_maxdiv <- rsdc_maxdiv(sigma_matrix = forecast$sigma_matrix, 
                         value_cols = 1:K, 
                         predicted_corr = forecast$predicted_correlations, 
                         y = residuals, 

@@ -21,7 +21,7 @@
 #'   \item{K}{Number of assets.}
 #' }
 #' @export
-f_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
+rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
                      rebalance = c("daily", "monthly", "quarterly", "annually", "custom"),
                      dates = NULL,
                      long_only = TRUE) {
@@ -127,7 +127,7 @@ f_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #'   \item{assets}{Asset names.}
 #' }
 #' @export
-f_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
+rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
                      long_only = TRUE,
                      rebalance = c("daily", "monthly", "quarterly", "yearly", "custom"),
                      dates = NULL) {

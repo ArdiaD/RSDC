@@ -37,7 +37,7 @@
 #' The likelihood is computed using multivariate normal densities with mean zero and unit variance.
 #'
 #' @export
-f_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) {
+rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) {
 
   if (!is.matrix(y)) stop("y must be a numeric matrix.")
   if (!is.null(X) && !is.matrix(X)) stop("X must be a numeric matrix or NULL.")
@@ -191,10 +191,10 @@ f_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) {
 #' The Hamilton filter computes the filtered and smoothed regime probabilities internally.
 #' The negative log-likelihood is returned for use in optimization routines.
 #'
-#' @seealso \code{\link{f_hamilton}}, \code{\link{optim}}, \code{\link{DEoptim}}, \code{\link{plogis}}
+#' @seealso \code{\link{rsdc_hamilton}}, \code{\link{optim}}, \code{\link{DEoptim}}, \code{\link{plogis}}
 #'
 #' @export
-f_likelihood <- function(params, y, exog = NULL, K, N) {
+rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
   if (any(is.na(params)) || any(!is.finite(params))) return(1e10)
 
   # Parameter count calculation
@@ -228,7 +228,7 @@ f_likelihood <- function(params, y, exog = NULL, K, N) {
   if (any(abs(rho_matrix) >= 1)) return(1e10)
 
   # Run Hamilton filter
-  result <- f_hamilton(y, exog, beta, rho_matrix, K, N, P)
+  result <- rsdc_hamilton(y, exog, beta, rho_matrix, K, N, P)
 
   if (!is.finite(result$log_likelihood)) return(1e10)
 

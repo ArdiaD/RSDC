@@ -20,7 +20,7 @@
 #'   \item{transition_matrices}{Array (N × N × n) containing the transition matrix at each time \code{t}.}
 #' }
 #' @export
-f_simul_tvtp <- function(n, X, beta, mu, sigma, N, seed = NULL) {
+rsdc_simulate <- function(n, X, beta, mu, sigma, N, seed = NULL) {
   if (!requireNamespace("mvtnorm", quietly = TRUE)) {
     stop("Please install 'mvtnorm'.")
   }

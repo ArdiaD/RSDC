@@ -31,10 +31,10 @@
 #'   \item{y}{Matrix of residuals used for forecasting (in-sample or out-of-sample).}
 #' }
 #'
-#' @seealso \code{\link{f_hamilton}}, \code{\link{estimate_model}}, \code{\link{f_minvar}}, \code{\link{f_maxdiv}}
+#' @seealso \code{\link{rsdc_hamilton}}, \code{\link{estimate_model}}, \code{\link{f_minvar}}, \code{\link{f_maxdiv}}
 #'
 #' @export
-f_forecast_cov <- function(method = c("tvtp", "noX", "const"),
+rsdc_forecast <- function(method = c("tvtp", "noX", "const"),
                          N,
                          residuals,
                          X = NULL,
@@ -74,7 +74,7 @@ f_forecast_cov <- function(method = c("tvtp", "noX", "const"),
                                ncol = K * (K - 1) / 2, byrow = TRUE)
   } else {
     # Use Hamilton filter to get smoothed_probs
-    result_filter <- RSDC::f_hamilton(
+    result_filter <- RSDC::rsdc_hamilton(
       y = if (out_of_sample) residuals_is else residuals_oos,
       X = if (method == "tvtp") if (out_of_sample) X_is else X_oos else NULL,
       beta = if (method == "tvtp") final_params$beta else NULL,

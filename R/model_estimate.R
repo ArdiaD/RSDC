@@ -24,7 +24,6 @@
 #' }
 #'
 #' @importFrom DEoptim DEoptim
-#' @export
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 
   require(DEoptim)
@@ -62,7 +61,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   # DEoptim
   set.seed(123)
   results <- DEoptim(
-    fn = f_likelihood,
+    fn = rsdc_likelihood,
     lower = bounds$lower,
     upper = bounds$upper,
     control = list(
@@ -73,7 +72,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
       CR = 0.9,
       trace = con$do_trace,
       parallelType = 1,
-      parVar = c("f_hamilton", "f_likelihood", "plogis"),
+      parVar = c("rsdc_hamilton", "rsdc_likelihood", "plogis"),
       packages = c("mvtnorm"),
       reltol = 1e-8,
       steptol = 50
@@ -87,7 +86,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   # Optim refinement (fixed residual reference)
   result_optim <- optim(
     par = results$optim$bestmem,
-    fn = f_likelihood,
+    fn = rsdc_likelihood,
     method = "L-BFGS-B",
     lower = bounds$lower,
     upper = bounds$upper,
@@ -186,7 +185,6 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' }
 #'
 #' @importFrom DEoptim DEoptim
-#' @export
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -213,7 +211,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 
   set.seed(123)
   de_result <- DEoptim::DEoptim(
-    fn = f_likelihood,
+    fn = rsdc_likelihood,
     lower = bounds$lower,
     upper = bounds$upper,
     control = list(itermax = 500, NP = 10 * length(bounds$lower),
@@ -224,7 +222,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 
   optim_result <- optim(
     par = de_result$optim$bestmem,
-    fn = f_likelihood,
+    fn = rsdc_likelihood,
     method = "L-BFGS-B",
     lower = bounds$lower,
     upper = bounds$upper,
@@ -287,7 +285,6 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #' }
 #'
 #' @importFrom DEoptim DEoptim
-#' @export
 f_optim_const <- function(residuals, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -380,7 +377,7 @@ f_optim_const <- function(residuals, control = list()) {
 #' \code{\link{f_optim}}, \code{\link{f_optim_noX}}, and \code{\link{f_optim_const}} for details.
 #'
 #' @export
-estimate_model <- function(method = c("tvtp", "noX", "const"), residuals, N = 2, X = NULL, out_of_sample = FALSE, control = list()) {
+rsdc_estimate <- function(method = c("tvtp", "noX", "const"), residuals, N = 2, X = NULL, out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
 
   con <- list(do_trace = FALSE)
@@ -401,7 +398,3 @@ estimate_model <- function(method = c("tvtp", "noX", "const"), residuals, N = 2,
 
   stop("Unknown method: ", method)
 }
-
-
-
-
