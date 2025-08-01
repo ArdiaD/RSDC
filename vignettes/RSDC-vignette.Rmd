@@ -713,14 +713,12 @@ still demonstrate the usage:
 port_minvar <- rsdc_minvar(sigma_matrix = forecast$sigma_matrix, 
                         value_cols = 1:K, 
                         predicted_corr = forecast$predicted_correlations, 
-                        y = residuals, 
-                        rebalance = c("daily"),
+                        y = residuals,
                         long_only = TRUE)
 port_maxdiv <- rsdc_maxdiv(sigma_matrix = forecast$sigma_matrix, 
                         value_cols = 1:K, 
                         predicted_corr = forecast$predicted_correlations, 
-                        y = residuals, 
-                        rebalance = c("daily"),
+                        y = residuals,
                         long_only = TRUE) 
 # Examine the first few weight vectors: 
 head(port_minvar$weights, 5) 

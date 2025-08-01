@@ -22,15 +22,12 @@
 #' }
 #' @export
 rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
-                     rebalance = c("daily", "monthly", "quarterly", "annually", "custom"),
-                     dates = NULL,
                      long_only = TRUE) {
 
   if (!requireNamespace("quadprog", quietly = TRUE)) {
     stop("Package 'quadprog' is required. Install via install.packages('quadprog').")
   }
 
-  rebalance <- match.arg(rebalance)
   K <- length(value_cols)
   y <- matrix(as.numeric(y), ncol = K)
   colnames(y) <- value_cols
@@ -82,23 +79,10 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
     portfolio_returns[t] <- sum(y[t, ] * weights) / 100
   }
 
-  scaling_factor <- switch(
-    rebalance,
-    "daily"     = sqrt(252),
-    "monthly"   = sqrt(12),
-    "quarterly" = sqrt(4),
-    "annually"  = 1,
-    "custom"    = {
-      if (is.null(dates)) stop("You must provide custom dates if rebalance = 'custom'.")
-      rebalance_freq <- length(unique(dates)) / T
-      sqrt(1 / rebalance_freq)
-    }
-  )
-
   structure(list(
     cov_matrices = cov_matrices,
     weights = portfolio_weights,
-    volatility = sd(portfolio_returns, na.rm = TRUE) * scaling_factor,
+    volatility = sd(portfolio_returns, na.rm = TRUE),
     y = y,
     K = K
   ), class = "minvar_portfolio")
@@ -128,26 +112,10 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #' }
 #' @export
 rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
-                     long_only = TRUE,
-                     rebalance = c("daily", "monthly", "quarterly", "yearly", "custom"),
-                     dates = NULL) {
+                     long_only = TRUE) {
   if (!requireNamespace("Rsolnp", quietly = TRUE)) {
     stop("Package 'Rsolnp' is required. Install via install.packages('Rsolnp').")
   }
-
-  rebalance <- match.arg(rebalance)
-  scale_factor <- switch(
-    rebalance,
-    daily = sqrt(252),
-    monthly = sqrt(12),
-    quarterly = sqrt(4),
-    yearly = 1,
-    custom = {
-      if (is.null(dates)) stop("You must provide a 'dates' vector when using custom rebalancing.")
-      freq <- length(unique(lubridate::floor_date(as.Date(dates), "month")))
-      sqrt(freq)
-    }
-  )
 
   K <- length(value_cols)
   y <- matrix(as.numeric(y), ncol = K)
@@ -218,6 +186,6 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
     mean_diversification = mean(diversification_ratios, na.rm = TRUE),
     K = K,
     assets = value_cols,
-    volatility = sd(portfolio_returns) * scale_factor
+    volatility = sd(portfolio_returns)
   ), class = "maxdiv_portfolio")
 }

@@ -41,17 +41,19 @@ rsdc_forecast <- function(method = c("tvtp", "noX", "const"),
                          final_params,
                          sigma_matrix,
                          value_cols,
-                         out_of_sample = FALSE) {
+                         out_of_sample = FALSE,
+                         control = list()) {
 
-
-  ### !!! METTRE UNE POSSIBILITÉ DE CHOISIR LES NOMS QU'ON VEUT POUR FINAL PARAMS !!! ###
+  con <- list(threshold = 0.7)
+  con[names(control)] <- control
+  thresh <- con$threshold
 
   method <- match.arg(method)
   K <- ncol(residuals)
   n_obs <- nrow(residuals)
 
   if (out_of_sample) {
-    is_cut <- round(0.7 * n_obs)
+    is_cut <- round(thresh * n_obs)
     residuals_is <- residuals[1:is_cut, ]
     residuals_oos <- residuals[(is_cut + 1):n_obs, ]
     sigma_matrix_oos <- sigma_matrix[(is_cut + 1):n_obs, ]
