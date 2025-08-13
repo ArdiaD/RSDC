@@ -12,7 +12,8 @@ rsdc_forecast(
   final_params,
   sigma_matrix,
   value_cols,
-  out_of_sample = FALSE
+  out_of_sample = FALSE,
+  control = list()
 )
 }
 \arguments{

@@ -1,41 +1,42 @@
-test_that("f_hamilton returns correct output structure and dimensions", {
-  set.seed(42)
+test_that("rsdc_hamilton works with fixed transition matrix (no X)", {
+  y <- toy_residuals(T = 40, K = 3)
+  K <- ncol(y); N <- 2
+  rho <- toy_rho_matrix(K)
+  P <- toy_P()
 
-  T <- 50
-  K <- 3
-  N <- 2
-  p <- 2
+  fit <- rsdc_hamilton(y = y, X = NULL, beta = NULL,
+                       rho_matrix = rho, K = K, N = N, P = P)
 
-  # Simulated inputs
-  y <- matrix(rnorm(T * K), ncol = K)
-  X <- matrix(rnorm(T * p), ncol = p)
-  beta <- matrix(rnorm(N * p), nrow = N)
-  rho_matrix <- matrix(runif(N * choose(K, 2), -0.5, 0.5), nrow = N)
+  expect_type(fit$log_likelihood, "double")
+  expect_true(is.finite(fit$log_likelihood))
+  expect_equal(dim(fit$filtered_probs), c(N, nrow(y)))
+  expect_equal(dim(fit$smoothed_probs), c(N, nrow(y)))
 
-  # Ensure valid correlation matrices
-  for (i in 1:N) {
-    temp <- diag(K)
-    temp[lower.tri(temp)] <- rho_matrix[i, ]
-    temp[upper.tri(temp)] <- t(temp)[upper.tri(temp)]
-    if (min(eigen(temp)$values) < 0.1) {
-      rho_matrix[i, ] <- rho_matrix[i, ] * 0.5  # shrink values if matrix nearly singular
-    }
-  }
-
-  result <- RSDC::f_hamilton(
-    y = y,
-    X = X,
-    beta = beta,
-    rho_matrix = rho_matrix,
-    K = K,
-    N = N
-  )
-
-  expect_type(result, "list")
-  expect_named(result, c("filtered_probs", "smoothed_probs", "log_likelihood"))
-  expect_equal(dim(result$filtered_probs), c(N, T))
-  expect_equal(dim(result$smoothed_probs), c(N, T))
-  expect_type(result$log_likelihood, "double")
-  expect_true(is.finite(result$log_likelihood))
+  # columns of probabilities sum to 1 and are in [0,1]
+  cs_f <- colSums(fit$filtered_probs)
+  cs_s <- colSums(fit$smoothed_probs)
+  expect_true(all(abs(cs_f - 1) < 1e-8))
+  expect_true(all(abs(cs_s - 1) < 1e-8))
+  expect_true(all(fit$filtered_probs >= 0 & fit$filtered_probs <= 1))
+  expect_true(all(fit$smoothed_probs  >= 0 & fit$smoothed_probs  <= 1))
 })
+
+test_that("rsdc_hamilton works with TVTP (X, beta)", {
+  y <- toy_residuals(T = 40, K = 3)
+  K <- ncol(y); N <- 2
+  rho <- toy_rho_matrix(K)
+  # simple covariate: intercept + trend
+  X <- cbind(1, scale(seq_len(nrow(y))))
+  p <- ncol(X)
+  # beta rows per regime; make regime 1 more persistent
+  beta <- rbind(c(2,  0.0),
+                c(1, -0.1))
+
+  fit <- rsdc_hamilton(y = y, X = X, beta = beta,
+                       rho_matrix = rho, K = K, N = N, P = NULL)
+  expect_true(is.finite(fit$log_likelihood))
+  expect_equal(dim(fit$filtered_probs), c(N, nrow(y)))
+  expect_equal(dim(fit$smoothed_probs), c(N, nrow(y)))
+})
+
 

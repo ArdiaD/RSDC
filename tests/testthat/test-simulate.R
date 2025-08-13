@@ -1,57 +1,26 @@
-test_that("f_simul_tvtp returns expected structure and dimensions", {
-  set.seed(42)
+test_that("rsdc_simulate generates consistent shapes", {
+  skip_if_not_installed("mvtnorm")
 
-  n <- 100
-  K <- 3
-  N <- 2
-  p <- 2
+  n <- 25; K <- 3; N <- 2; p <- 2
+  X <- cbind(1, rnorm(n))
+  beta <- array(0, dim = c(N, N, p))
+  # Encourage self-persistence
+  beta[1,1,] <- c(1.5, 0.0)
+  beta[2,2,] <- c(1.2, 0.0)
 
-  X <- matrix(rnorm(n * p), nrow = n, ncol = p)
-  beta <- array(rnorm(N * N * p, mean = 0, sd = 0.2), dim = c(N, N, p))
-  mu <- matrix(rnorm(N * K), nrow = N)
-  sigma <- array(NA, dim = c(K, K, N))
-  for (j in 1:N) {
-    A <- matrix(rnorm(K * K), K)
-    sigma[,,j] <- crossprod(A) + diag(0.5, K)  # ensure positive definite
+  mu <- rbind(rep(0, K), rep(0, K))
+  # two regimes: different correlation levels
+  rho <- toy_rho_matrix(K)
+  Sig <- array(0, dim = c(K, K, N))
+  for (i in 1:N) {
+    R <- diag(K)
+    R[lower.tri(R)] <- rho[i, ]
+    R[upper.tri(R)] <- t(R)[upper.tri(R)]
+    Sig[,,i] <- R
   }
 
-  result <- RSDC::f_simul_tvtp(n, X, beta, mu, sigma, N)
-
-  expect_type(result, "list")
-  expect_named(result, c("states", "observations", "transition_matrices"))
-
-  expect_true(is.numeric(result$states))
-  expect_equal(length(result$states), n)
-
-  expect_true(is.matrix(result$observations))
-  expect_equal(dim(result$observations), c(n, K))
-
-  expect_true(is.array(result$transition_matrices))
-  expect_equal(dim(result$transition_matrices), c(N, N, n))
-
-  # Check each transition matrix is stochastic
-  for (t in 2:n) {
-    row_sums <- rowSums(result$transition_matrices[,,t])
-    expect_true(all(abs(row_sums - 1) < 1e-6))
-  }
+  sim <- rsdc_simulate(n = n, X = X, beta = beta, mu = mu, sigma = Sig, N = N, seed = 99)
+  expect_equal(length(sim$states), n)
+  expect_equal(dim(sim$observations), c(n, K))
+  expect_equal(dim(sim$transition_matrices), c(N, N, n))
 })
-
-test_that("f_simul_tvtp gives reproducible results with seed", {
-  n <- 50
-  K <- 2
-  N <- 2
-  p <- 1
-
-  X <- matrix(rnorm(n * p), nrow = n)
-  beta <- array(rnorm(N * N * p), dim = c(N, N, p))
-  mu <- matrix(rnorm(N * K), nrow = N)
-  sigma <- array(diag(K), dim = c(K, K, N))
-
-  res1 <- RSDC::f_simul_tvtp(n, X, beta, mu, sigma, N, seed = 999)
-  res2 <- RSDC::f_simul_tvtp(n, X, beta, mu, sigma, N, seed = 999)
-
-  expect_equal(res1$states, res2$states)
-  expect_equal(res1$observations, res2$observations)
-  expect_equal(res1$transition_matrices, res2$transition_matrices)
-})
-

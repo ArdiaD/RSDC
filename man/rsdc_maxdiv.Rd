@@ -4,15 +4,7 @@
 \alias{rsdc_maxdiv}
 \title{Maximum Diversification Portfolio Weights}
 \usage{
-rsdc_maxdiv(
-  sigma_matrix,
-  value_cols,
-  predicted_corr,
-  y,
-  long_only = TRUE,
-  rebalance = c("daily", "monthly", "quarterly", "yearly", "custom"),
-  dates = NULL
-)
+rsdc_maxdiv(sigma_matrix, value_cols, predicted_corr, y, long_only = TRUE)
 }
 \arguments{
 \item{sigma_matrix}{Matrix (T × K) of forecasted volatilities.}

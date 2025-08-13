@@ -4,15 +4,7 @@
 \alias{rsdc_minvar}
 \title{Minimum Variance Portfolio Weights}
 \usage{
-rsdc_minvar(
-  sigma_matrix,
-  value_cols,
-  predicted_corr,
-  y,
-  rebalance = c("daily", "monthly", "quarterly", "annually", "custom"),
-  dates = NULL,
-  long_only = TRUE
-)
+rsdc_minvar(sigma_matrix, value_cols, predicted_corr, y, long_only = TRUE)
 }
 \arguments{
 \item{sigma_matrix}{Matrix (T × K) of forecasted volatilities.}
@@ -23,11 +15,11 @@ rsdc_minvar(
 
 \item{y}{Matrix (T × K) of asset returns.}
 
+\item{long_only}{Logical. If TRUE, applies long-only constraints (default: TRUE).}
+
 \item{rebalance}{Character. Rebalancing frequency used for volatility scaling. One of \code{"daily"}, \code{"monthly"}, \code{"quarterly"}, \code{"annually"}, or \code{"custom"}. Default is \code{"daily"}.}
 
 \item{dates}{Optional vector of custom rebalancing dates (only used if \code{rebalance = "custom"}).}
-
-\item{long_only}{Logical. If TRUE, applies long-only constraints (default: TRUE).}
 }
 \value{
 A list of class \code{"minvar_portfolio"} containing:

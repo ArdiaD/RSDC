@@ -207,7 +207,7 @@ rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
   if (is.null(exog)) {
     # Without exogenous variables, extract transition parameters first
     trans_params <- params[1:n_p]
-    rho_matrix <- matrix(params[(n_p + 1):(n_p + n_rho)], nrow = N)
+    rho_matrix <- matrix(params[(n_p + 1):(n_p + n_rho)], nrow = N, byrow = TRUE)
     beta <- NULL
 
     # Build transition matrix
