@@ -1,38 +1,65 @@
-#' Forecast Covariance Matrices from Regime-Switching Model
+#' Forecast Covariance/Correlation Paths from an RSDC Model
 #'
-#' Computes predicted correlation and covariance matrices from a fitted
-#' regime-switching model. Supports constant, fixed-transition, and
-#' time-varying transition probability (TVTP) specifications.
+#' Generates per-period correlation and covariance matrices from a fitted model:
+#' \code{"const"} (constant correlation), \code{"noX"} (fixed transition matrix), or
+#' \code{"tvtp"} (time-varying transition probabilities).
 #'
-#' @param method Character. One of \code{"tvtp"} (time-varying transition probabilities),
-#'   \code{"noX"} (fixed transition matrix), or \code{"const"} (constant correlation).
-#' @param N Integer. Number of regimes (ignored if \code{method = "const"}).
-#' @param residuals Numeric matrix of dimension \eqn{T \times K}, where \eqn{T} is the number
-#'   of time steps and \eqn{K} is the number of assets.
-#' @param X Optional matrix of exogenous variables, of dimension \eqn{T \times p}. Required if \code{method = "tvtp"}.
-#' @param final_params A list of model parameters, typically returned by \code{\link{estimate_model}}.
-#'   It must include either:
-#'   \itemize{
-#'     \item \code{beta} and \code{correlations} (for \code{"tvtp"}),
-#'     \item or \code{transition_matrix} and \code{correlations} (for \code{"noX"}),
-#'     \item or just correlation info (for \code{"const"}).
-#'   }
-#' @param sigma_matrix Matrix of predicted standard deviations (T × K).
-#' @param value_cols Character or integer vector: names or indices of the volatility columns in \code{sigma_matrix}.
-#' @param out_of_sample Logical. If \code{TRUE}, use only the out-of-sample portion (last 30%) for forecasting.
+#' @param method Character. One of \code{"tvtp"}, \code{"noX"}, \code{"const"}.
+#' @param N Integer. Number of regimes (ignored for \code{"const"}).
+#' @param residuals Numeric matrix \eqn{T \times K} used to compute correlations or run the filter.
+#' @param X Optional numeric matrix \eqn{T \times p} (required for \code{"tvtp"}).
+#' @param final_params List with fitted parameters (e.g., from \code{\link{rsdc_estimate}}):
+#'   must include \code{correlations}, and either \code{transition_matrix} (\code{"noX"})
+#'   or \code{beta} (\code{"tvtp"}); include \code{log_likelihood} for BIC computation.
+#' @param sigma_matrix Numeric matrix \eqn{T \times K} of forecasted standard deviations.
+#' @param value_cols Character/integer vector of columns in \code{sigma_matrix} that define asset order.
+#' @param out_of_sample Logical. If \code{TRUE}, use a fixed 70/30 split; otherwise use the whole sample.
+#' @param control Optional list; supports \code{threshold} (in (0,1), default \code{0.7}).
 #'
-#' @return A named list with components:
+#' @return
 #' \describe{
-#'   \item{smoothed_probs}{Matrix (N × T) of smoothed regime probabilities (not available if \code{method = "const"}).}
-#'   \item{sigma_matrix}{Filtered matrix of standard deviations used for forecasting.}
-#'   \item{cov_matrices}{List of predicted covariance matrices for each time point (length T).}
-#'   \item{predicted_correlations}{Matrix (T × P) of predicted pairwise correlations, with \eqn{P = K(K-1)/2}.}
-#'   \item{BIC}{Bayesian Information Criterion value of the fitted model.}
-#'   \item{y}{Matrix of residuals used for forecasting (in-sample or out-of-sample).}
+#'   \item{\code{smoothed_probs}}{\eqn{N \times T^\ast} smoothed probabilities (\code{"noX"}/\code{"tvtp"} only).}
+#'   \item{\code{sigma_matrix}}{\eqn{T^\ast \times K} slice aligned to the forecast horizon.}
+#'   \item{\code{cov_matrices}}{List of \eqn{K \times K} covariance matrices \eqn{\Sigma_t = D_t R_t D_t}.}
+#'   \item{\code{predicted_correlations}}{\eqn{T^\ast \times \binom{K}{2}} pairwise correlations in \code{combn(K, 2)} order.}
+#'   \item{\code{BIC}}{Bayesian Information Criterion \eqn{\mathrm{BIC} = \log(n)\,k - 2\,\ell}.}
+#'   \item{\code{y}}{\eqn{T^\ast \times K} residual matrix aligned to the forecast horizon.}
 #' }
 #'
-#' @seealso \code{\link{rsdc_hamilton}}, \code{\link{estimate_model}}, \code{\link{f_minvar}}, \code{\link{f_maxdiv}}
+#' @details
+#' \itemize{
+#'   \item \strong{Forecast horizon:} If \code{out_of_sample = TRUE}, filter on the first \code{threshold}
+#'         fraction and forecast on the remainder.
+#'   \item \strong{Correlation paths:}
+#'         \itemize{
+#'           \item \code{"const"} — empirical correlation of \code{residuals}, repeated across time.
+#'           \item \code{"noX"}/\code{"tvtp"} — smoothed-probability weighted average of regime correlations.
+#'         }
+#'   \item \strong{Covariance build:} Reconstruct \eqn{R_t} from the pairwise vector (columns ordered by
+#'         \code{combn(K, 2)}), set \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}, and
+#'         \eqn{\Sigma_t = D_t R_t D_t}.
+#'   \item \strong{BIC:} Parameter count \eqn{k} is
+#'         \code{N * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"},
+#'         \code{N * (N - 1) + N * K * (K - 1) / 2} for \code{"noX"},
+#'         and \code{K * (K - 1) / 2} for \code{"const"}.
+#' }
 #'
+#' @examples
+#' set.seed(123)
+#' T <- 60; K <- 3; N <- 2
+#' y <- scale(matrix(rnorm(T*K), T, K))
+#' vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
+#' rho <- rbind(c(0.10, 0.05, 0.00), c(0.60, 0.40, 0.30))
+#' Pfix <- matrix(c(0.9, 0.1, 0.2, 0.8), 2, 2, byrow = TRUE)
+#' rsdc_forecast("noX", N, y, NULL,
+#'               list(correlations = rho, transition_matrix = Pfix, log_likelihood = -200),
+#'               vols, 1:K)
+#'
+#' @seealso \code{\link{rsdc_hamilton}}, \code{\link{rsdc_estimate}},
+#'   \code{\link{rsdc_minvar}}, \code{\link{rsdc_maxdiv}}
+#'
+#' @importFrom stats cor
+#' @importFrom utils combn
 #' @export
 rsdc_forecast <- function(method = c("tvtp", "noX", "const"),
                          N,

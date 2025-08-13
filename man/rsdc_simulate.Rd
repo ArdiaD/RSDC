@@ -2,36 +2,96 @@
 % Please edit documentation in R/simulate_data.R
 \name{rsdc_simulate}
 \alias{rsdc_simulate}
-\title{Simulate Multivariate Regime-Switching Data with TVTP}
+\title{Simulate Multivariate Regime-Switching Data (TVTP)}
 \usage{
 rsdc_simulate(n, X, beta, mu, sigma, N, seed = NULL)
 }
 \arguments{
 \item{n}{Integer. Number of time steps to simulate.}
 
-\item{X}{Numeric matrix (n × p) of covariates used to determine transition probabilities.
-Each row \code{X[t, ]} corresponds to covariates available at time \code{t}.}
+\item{X}{Numeric matrix \eqn{n \times p} of covariates used to form the transition
+probabilities. Row \code{X[t, ]} corresponds to covariates available at time \code{t}.
+Only rows \code{1:(n-1)} are used to transition from \code{t-1} to \code{t}.}
 
-\item{beta}{Numeric array (N × N × p). Coefficients for the multinomial logistic transition model.
-Each slice \code{beta[i, j, ]} corresponds to the transition from state \code{i} to \code{j}.}
+\item{beta}{Numeric array \eqn{N \times N \times p}. Softmax coefficients for the
+multinomial transition model; \code{beta[i, j, ]} parameterizes the transition
+from state \eqn{i} to state \eqn{j}.}
 
-\item{mu}{Numeric matrix (N × K). Regime-specific mean vectors.}
+\item{mu}{Numeric matrix \eqn{N \times K}. Regime-specific mean vectors.}
 
-\item{sigma}{Numeric array (K × K × N). Regime-specific covariance matrices.}
+\item{sigma}{Numeric array \eqn{K \times K \times N}. Regime-specific covariance
+(here, correlation/variance) matrices; each \eqn{K \times K} slice must be
+symmetric positive definite.}
 
 \item{N}{Integer. Number of regimes.}
 
-\item{seed}{Optional integer. If provided, sets the random seed for reproducibility.}
+\item{seed}{Optional integer. If supplied, sets the RNG seed for reproducibility.}
 }
 \value{
-A list with components:
+A list with:
 \describe{
-\item{states}{Integer vector (length \code{n}) indicating the active regime at each time.}
-\item{observations}{Numeric matrix (n × K) of simulated multivariate observations.}
-\item{transition_matrices}{Array (N × N × n) containing the transition matrix at each time \code{t}.}
+\item{states}{Integer vector of length \code{n}; the simulated regime index at each time.}
+\item{observations}{Numeric matrix \eqn{n \times K}; the simulated observations.}
+\item{transition_matrices}{Array \eqn{N \times N \times n}; the transition matrix \eqn{P_t}
+used at each time step (with \eqn{P_1} undefined by construction; see Details).}
 }
 }
 \description{
-Simulates a multivariate time series from a regime-switching model
-with time-varying transition probabilities (TVTP) driven by covariates.
+Simulates a multivariate time series from a regime-switching model with
+\emph{time-varying transition probabilities} (TVTP) driven by covariates \code{X}.
+Transition probabilities are generated via a multinomial logistic (softmax) link;
+observations are drawn from regime-specific Gaussian distributions.
+}
+\details{
+\itemize{
+\item \strong{Initial state and first draw:} The initial regime \eqn{S_1} is sampled
+uniformly; the first observation \eqn{y_1} is drawn from
+\eqn{\mathcal{N}(\mu_{S_1}, \Sigma_{S_1})}.
+\item \strong{TVTP via softmax:} For \eqn{t \ge 2}, the row \eqn{i} of \eqn{P_t} is
+\deqn{P_t(i, j) = \frac{\exp\!\big(X_{t-1}^\top \beta_{i,j}\big)}
+                          {\sum_{h=1}^N \exp\!\big(X_{t-1}^\top \beta_{i,h}\big)}\,,}
+computed with log-sum-exp stabilization.
+\item \strong{Sampling:} Given \eqn{S_{t-1}}, draw \eqn{S_t} from the categorical
+distribution with probabilities \eqn{P_t(S_{t-1}, \cdot)} and
+\eqn{y_t \sim \mathcal{N}(\mu_{S_t}, \Sigma_{S_t})}.
+}
+}
+\note{
+Requires \pkg{mvtnorm} for multivariate normal sampling (called as \code{mvtnorm::rmvnorm}).
+}
+\examples{
+set.seed(123)
+n <- 200; K <- 3; N <- 2; p <- 2
+# Covariates: intercept + trend
+X <- cbind(1, scale(seq_len(n)))
+
+# TVTP coefficients: encourage persistence on the diagonal
+beta <- array(0, dim = c(N, N, p))
+beta[1, 1, ] <- c(1.2,  0.0)
+beta[2, 2, ] <- c(1.0, -0.1)
+
+# Regime means and covariances
+mu <- rbind(c(0, 0, 0),
+            c(0, 0, 0))
+rho <- rbind(c(0.10, 0.05, 0.00),
+             c(0.60, 0.40, 0.30))  # lower-tri for K=3: (2,1), (3,1), (3,2)
+Sig <- array(0, dim = c(K, K, N))
+for (m in 1:N) {
+  R <- diag(K); R[lower.tri(R)] <- rho[m, ]; R[upper.tri(R)] <- t(R)[upper.tri(R)]
+  Sig[, , m] <- R
+
+sim <- rsdc_simulate(n = n, X = X, beta = beta, mu = mu, sigma = Sig, N = N, seed = 99)
+table(sim$states)
+dim(sim$observations)
+}
+
+}
+\references{
+Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
+and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+}
+\seealso{
+\code{\link{rsdc_hamilton}} (filter/evaluation),
+\code{\link{rsdc_estimate}} (estimators),
+\code{\link{rsdc_forecast}} (forecasting)
 }

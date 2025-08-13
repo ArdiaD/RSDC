@@ -2,37 +2,73 @@
 % Please edit documentation in R/pf_optimize.R
 \name{rsdc_maxdiv}
 \alias{rsdc_maxdiv}
-\title{Maximum Diversification Portfolio Weights}
+\title{Maximum-Diversification Portfolio (Rolling Weights)}
 \usage{
 rsdc_maxdiv(sigma_matrix, value_cols, predicted_corr, y, long_only = TRUE)
 }
 \arguments{
-\item{sigma_matrix}{Matrix (T × K) of forecasted volatilities.}
+\item{sigma_matrix}{Numeric matrix \eqn{T \times K} of forecasted standard deviations.}
 
-\item{value_cols}{Character or integer vector identifying volatility columns in \code{sigma_matrix}.}
+\item{value_cols}{Character/integer vector naming columns in \code{sigma_matrix} (asset order).}
 
-\item{predicted_corr}{Matrix (T × P) of predicted pairwise correlations.}
+\item{predicted_corr}{Numeric matrix \eqn{T \times \binom{K}{2}} of pairwise correlations
+in \code{combn(K, 2)} column order.}
 
-\item{y}{Matrix (T × K) of asset returns.}
+\item{y}{Numeric matrix \eqn{T \times K} of asset returns (for realized stats).}
 
-\item{long_only}{Logical. If TRUE, applies long-only constraints (default: TRUE).}
-
-\item{rebalance}{Character. Rebalancing frequency used for volatility scaling.
-One of \code{"daily"}, \code{"monthly"}, \code{"quarterly"}, \code{"yearly"}, or \code{"custom"}.}
-
-\item{dates}{Optional. Vector of dates (class \code{Date}) required only if \code{rebalance = "custom"}.}
+\item{long_only}{Logical. If \code{TRUE}, impose \eqn{w \ge 0} and \eqn{\sum_i w_i = 1};
+otherwise bounds are \eqn{-1 \le w_i \le 1} with \eqn{\sum_i w_i = 1}.}
 }
 \value{
-A list of class \code{"maxdiv_portfolio"} containing:
 \describe{
-\item{weights}{T × K matrix of portfolio weights.}
-\item{returns}{Vector of portfolio returns.}
-\item{diversification_ratios}{Vector of realized diversification ratios.}
-\item{mean_diversification}{Mean diversification ratio.}
-\item{K}{Number of assets.}
-\item{assets}{Asset names.}
+\item{\code{weights}}{\eqn{T \times K} matrix of weights.}
+\item{\code{returns}}{Vector of realized portfolio returns \code{sum(y[t,] * weights[t,])}.}
+\item{\code{diversification_ratios}}{Vector of realized diversification ratios.}
+\item{\code{mean_diversification}}{Average diversification ratio.}
+\item{\code{K}}{Number of assets.}
+\item{\code{assets}}{Asset names.}
+\item{\code{volatility}}{Standard deviation of realized portfolio returns.}
 }
 }
 \description{
-Computes dynamic max-diversification portfolio weights based on forecasted covariances.
+Computes rolling maximum-diversification (MaxDiv) portfolio weights from a sequence
+of per-period covariance matrices implied by forecasted volatilities and correlations.
+Falls back to equal weights if the nonlinear solver fails.
+}
+\details{
+\itemize{
+\item \strong{Covariance build:} For each \eqn{t}, reconstruct \eqn{R_t} from the
+pairwise vector; set \eqn{D_t=\mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})} and
+\eqn{\Sigma_t = D_t R_t D_t}.
+\item \strong{Objective (MaxDiv):} maximize
+\eqn{\mathrm{DR}(w) = \frac{\sum_i w_i \sigma_{t,i}}{\sqrt{w^\top \Sigma_t w}}}
+subject to \eqn{\sum_i w_i = 1} and bounds on \eqn{w}. Implemented by minimizing
+the negative ratio.
+\item \strong{Solver:} \code{Rsolnp::solnp} with equality \eqn{\sum_i w_i = 1} and
+bounds by \code{long_only}; on error, weights default to \eqn{1/K}.
+}
+}
+\examples{
+# Toy example with K = 3
+if (requireNamespace("Rsolnp", quietly = TRUE)) {
+  T <- 50; K <- 3
+  set.seed(42)
+  vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
+  colnames(vols) <- paste0("A", 1:K)
+  # simple, stationary correlations (order: (2,1), (3,1), (3,2))
+  pred_corr <- cbind(rep(0.20, T), rep(0.10, T), rep(0.05, T))
+  rets <- matrix(rnorm(T*K, sd = 0.01), T, K); colnames(rets) <- colnames(vols)
+
+  mx <- rsdc_maxdiv(sigma_matrix   = vols,
+                    value_cols     = colnames(vols),
+                    predicted_corr = pred_corr,
+                    y              = rets,
+                    long_only      = TRUE)
+  head(mx$weights)
+  mx$mean_diversification
+}
+
+}
+\seealso{
+\code{\link{rsdc_minvar}}, \code{\link[Rsolnp]{solnp}}
 }

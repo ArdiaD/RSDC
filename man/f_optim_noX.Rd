@@ -2,38 +2,78 @@
 % Please edit documentation in R/model_estimate.R
 \name{f_optim_noX}
 \alias{f_optim_noX}
-\title{Estimate Regime-Switching Correlation Model with Constant Transition Matrix}
+\title{Regime-Switching Correlation (Fixed Transition Matrix, no X)}
 \usage{
 f_optim_noX(N, residuals, out_of_sample = FALSE, control = list())
 }
 \arguments{
 \item{N}{Integer. Number of regimes.}
 
-\item{residuals}{A numeric matrix of dimension T × K. Typically standardized residuals or returns.}
+\item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals or returns
+(columns are treated as mean-zero with unit variance).}
 
-\item{out_of_sample}{Logical. If \code{TRUE}, the first 70\\% of the data is used for estimation,
-and the remaining 30\\% is reserved for out-of-sample forecasting.}
+\item{out_of_sample}{Logical. If \code{TRUE}, estimation uses the first 70\\% of rows; the
+remainder is held out. (Split index is a fixed 70/30 cut.)}
 
-\item{control}{Optional list of control arguments (e.g., \code{do_trace = TRUE}) passed to internal DEoptim control.}
+\item{control}{Optional list. Currently supports \code{do_trace = TRUE} to print optimizer
+progress. Algorithmic hyperparameters are set internally.}
 }
 \value{
-A list with the following components:
+A list with:
 \describe{
-\item{transition_matrix}{Estimated fixed transition matrix of dimension N × N.}
-\item{means}{A placeholder matrix of zeros (N × K) for regime-specific means (not estimated).}
-\item{volatilities}{A placeholder matrix of ones (N × K) for regime-specific volatilities (not estimated).}
-\item{correlations}{A matrix of regime-specific pairwise correlations (N × C),
-where C = K(K−1)/2 is the number of unique pairwise correlations.}
-\item{covariances}{An array of full correlation matrices for each regime (K × K × N).}
-\item{log_likelihood}{The log-likelihood of the fitted model.}
-\item{beta}{\code{NULL} (no exogenous variables used in this specification).}
+\item{transition_matrix}{Estimated \eqn{N \times N} fixed transition matrix.}
+\item{means}{\eqn{N \times K} zeros (placeholders; means are not estimated).}
+\item{volatilities}{\eqn{N \times K} ones (placeholders; vols are not estimated).}
+\item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations,
+with \eqn{C = K(K-1)/2}.}
+\item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
+\item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+\item{beta}{\code{NULL} (no covariates in this specification).}
 }
 }
 \description{
-Fits a multivariate regime-switching correlation model with a fixed (time-invariant) transition matrix.
-This variant does not use any exogenous covariates; the transition probabilities are constant and estimated
-as part of the optimization process.
+Estimates a multivariate correlation model with a \emph{time-invariant} (fixed) regime
+transition matrix. No exogenous covariates are used; both the fixed transition probabilities
+and the regime-specific correlation parameters are estimated by global search
+(\pkg{DEoptim}) followed by local refinement (L-BFGS-B).
 }
 \details{
-The estimation is done via differential evolution followed by local refinement using L-BFGS-B.
+\itemize{
+\item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
+\eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
+\item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
+for numerical stability and identifiability.
+\item \strong{Correlation build:} Each regime’s correlation matrix is reconstructed from
+its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
+likelihood routine.
+}
+}
+\note{
+Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+}
+\section{Assumptions}{
+
+Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
+structure and fixed transition probabilities are estimated.
+}
+
+\examples{
+\dontrun{
+T <- 50; K <- 3; N <- 2
+y <- matrix(rnorm(T * K), T, K)
+fit <- f_optim_noX(N = N, residuals = y)
+fit$transition_matrix
+fit$correlations
+}
+
+}
+\references{
+Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
+and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+Storn, R. & Price, K. (1997). Differential Evolution – A simple and efficient heuristic
+for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+}
+\seealso{
+\code{\link{f_optim}} (TVTP), \code{\link{f_optim_const}} (constant correlation),
+\code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 }

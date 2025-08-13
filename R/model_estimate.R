@@ -1,32 +1,62 @@
-#' Estimate Regime-Switching Correlation Model with TVTP
+#' Regime-Switching Correlation (TVTP) — DEoptim + L-BFGS-B
 #'
-#' Fits a multivariate regime-switching model with time-varying transition probabilities (TVTP),
-#' using differential evolution followed by L-BFGS-B optimization.
+#' Estimates a multivariate correlation model with \emph{time-varying transition probabilities} (TVTP).
+#' Regime persistence \eqn{p_{ii,t}} is modeled via a logistic link on exogenous covariates \code{X};
+#' off-diagonal transition probabilities are set equal to \eqn{(1 - p_{ii,t})/(N-1)}. Correlations are
+#' regime-specific and reconstructed from lower-triangular parameters. Optimization uses global search
+#' (\pkg{DEoptim}) followed by local refinement (L-BFGS-B).
 #'
 #' @param N Integer. Number of regimes.
-#' @param residuals A numeric matrix of dimension T × K. Typically standardized residuals or returns.
-#' @param X A numeric matrix of dimension T × p. Exogenous variables used to drive the transition probabilities.
-#' Must include a column of ones if an intercept is desired (not added automatically).
-#' @param out_of_sample Logical. If \code{TRUE}, the first 70\% of the data is used for estimation,
-#' and the remaining 30\% is reserved for out-of-sample forecasting.
-#' @param control Optional list of control arguments (e.g., \code{do_trace = TRUE}) passed to internal DEoptim control.
+#' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals or returns
+#'   (unit variance per column is assumed).
+#' @param X Numeric matrix \eqn{T \times p} of exogenous covariates driving TVTP.
+#'   Include an intercept column yourself if desired (no automatic intercept).
+#' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70% of rows; the remainder is
+#'   held out (indices are fixed by a 70/30 split).
+#' @param control Optional list. Currently supports \code{do_trace = TRUE} to print optimizer progress.
+#'   (Algorithmic hyperparameters are set internally.)
 #'
-#' @return A list with the following components:
+#' @returns A list with:
 #' \describe{
-#'   \item{transition_matrix}{The average regime transition matrix evaluated at the mean of \code{X}.}
-#'   \item{means}{A placeholder matrix of zeros (N × K) for regime-specific means (not estimated).}
-#'   \item{volatilities}{A placeholder matrix of ones (N × K) for regime-specific volatilities (not estimated).}
-#'   \item{correlations}{A matrix of regime-specific correlation coefficients (N × C),
-#'   where C = K(K−1)/2 is the number of unique pairwise correlations.}
-#'   \item{covariances}{An array of full correlation matrices for each regime (K × K × N).}
-#'   \item{log_likelihood}{The log-likelihood of the fitted model.}
-#'   \item{beta}{Matrix of estimated logistic regression coefficients for the TVTP specification (N × p).}
+#'   \item{transition_matrix}{Average \eqn{N \times N} transition matrix evaluated at \code{colMeans(X)}.}
+#'   \item{means}{\eqn{N \times K} zeros (placeholders; means are not estimated).}
+#'   \item{volatilities}{\eqn{N \times K} ones (placeholders; vols are not estimated).}
+#'   \item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations, \eqn{C = K(K-1)/2}.}
+#'   \item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
+#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+#'   \item{beta}{\eqn{N \times p} matrix of TVTP coefficients.}
 #' }
 #'
-#' @importFrom DEoptim DEoptim
+#' @details
+#' \itemize{
+#'   \item \strong{TVTP parameterization:} diagonal entries use \code{plogis(X \%*\% beta[i, ])};
+#'         off-diagonals are equal and sum to one.
+#'   \item \strong{Bounds:} \eqn{\beta \in [-10, 10]} elementwise; correlations \eqn{\in (-1, 1)}.
+#'   \item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
+#'   \item \strong{Numerical safeguards:} tiny ridge is added in inverses; non-PD proposals are penalized.
+#' }
+#'
+#' @section Assumptions:
+#' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation structure is estimated.
+#'
+#' @examples
+#' \dontrun{
+#' T <- 60; K <- 3; N <- 2
+#' y <- matrix(rnorm(T * K), T, K)
+#' X <- cbind(1, scale(seq_len(T)))
+#' fit <- f_optim(N = N, residuals = y, X = X)
+#' str(fit$correlations)
+#' }
+#'
+#' @seealso \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
+#' @references
+#'   Hamilton, J. D. (1989). \emph{Econometrica}, 57(2), 357–384. (Regime filtering)
+#'   Storn, R. & Price, K. (1997). \emph{J. Global Optimization}, 11(4), 341–359. (DE)
+#'
+#' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+#'
+#' @importFrom stats optim plogis
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
-
-  require(DEoptim)
 
   con <- list(do_trace = FALSE)
   con[names(control)] <- control
@@ -60,7 +90,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 
   # DEoptim
   set.seed(123)
-  results <- DEoptim(
+  results <- DEoptim::DEoptim(
     fn = rsdc_likelihood,
     lower = bounds$lower,
     upper = bounds$upper,
@@ -158,33 +188,69 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   )
 }
 
-#' Estimate Regime-Switching Correlation Model with Constant Transition Matrix
+#' Regime-Switching Correlation (Fixed Transition Matrix, no X)
 #'
-#' Fits a multivariate regime-switching correlation model with a fixed (time-invariant) transition matrix.
-#' This variant does not use any exogenous covariates; the transition probabilities are constant and estimated
-#' as part of the optimization process.
-#'
-#' The estimation is done via differential evolution followed by local refinement using L-BFGS-B.
+#' Estimates a multivariate correlation model with a \emph{time-invariant} (fixed) regime
+#' transition matrix. No exogenous covariates are used; both the fixed transition probabilities
+#' and the regime-specific correlation parameters are estimated by global search
+#' (\pkg{DEoptim}) followed by local refinement (L-BFGS-B).
 #'
 #' @param N Integer. Number of regimes.
-#' @param residuals A numeric matrix of dimension T × K. Typically standardized residuals or returns.
-#' @param out_of_sample Logical. If \code{TRUE}, the first 70\% of the data is used for estimation,
-#' and the remaining 30\% is reserved for out-of-sample forecasting.
-#' @param control Optional list of control arguments (e.g., \code{do_trace = TRUE}) passed to internal DEoptim control.
+#' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals or returns
+#'   (columns are treated as mean-zero with unit variance).
+#' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the
+#'   remainder is held out. (Split index is a fixed 70/30 cut.)
+#' @param control Optional list. Currently supports \code{do_trace = TRUE} to print optimizer
+#'   progress. Algorithmic hyperparameters are set internally.
 #'
-#' @return A list with the following components:
+#' @returns A list with:
 #' \describe{
-#'   \item{transition_matrix}{Estimated fixed transition matrix of dimension N × N.}
-#'   \item{means}{A placeholder matrix of zeros (N × K) for regime-specific means (not estimated).}
-#'   \item{volatilities}{A placeholder matrix of ones (N × K) for regime-specific volatilities (not estimated).}
-#'   \item{correlations}{A matrix of regime-specific pairwise correlations (N × C),
-#'   where C = K(K−1)/2 is the number of unique pairwise correlations.}
-#'   \item{covariances}{An array of full correlation matrices for each regime (K × K × N).}
-#'   \item{log_likelihood}{The log-likelihood of the fitted model.}
-#'   \item{beta}{\code{NULL} (no exogenous variables used in this specification).}
+#'   \item{transition_matrix}{Estimated \eqn{N \times N} fixed transition matrix.}
+#'   \item{means}{\eqn{N \times K} zeros (placeholders; means are not estimated).}
+#'   \item{volatilities}{\eqn{N \times K} ones (placeholders; vols are not estimated).}
+#'   \item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations,
+#'     with \eqn{C = K(K-1)/2}.}
+#'   \item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
+#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+#'   \item{beta}{\code{NULL} (no covariates in this specification).}
 #' }
 #'
-#' @importFrom DEoptim DEoptim
+#' @details
+#' \itemize{
+#'   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
+#'         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
+#'   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
+#'     for numerical stability and identifiability.
+#'   \item \strong{Correlation build:} Each regime’s correlation matrix is reconstructed from
+#'     its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
+#'     likelihood routine.
+#' }
+#'
+#' @section Assumptions:
+#' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
+#' structure and fixed transition probabilities are estimated.
+#'
+#' @examples
+#' \dontrun{
+#' T <- 50; K <- 3; N <- 2
+#' y <- matrix(rnorm(T * K), T, K)
+#' fit <- f_optim_noX(N = N, residuals = y)
+#' fit$transition_matrix
+#' fit$correlations
+#' }
+#'
+#' @seealso \code{\link{f_optim}} (TVTP), \code{\link{f_optim_const}} (constant correlation),
+#'   \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
+#'
+#' @references
+#'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
+#'   and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+#'   Storn, R. & Price, K. (1997). Differential Evolution – A simple and efficient heuristic
+#'   for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+#'
+#' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+#'
+#' @importFrom stats optim
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -262,29 +328,64 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   )
 }
 
-#' Estimate Constant Correlation Model
+#' Constant-Correlation Model (Single Regime)
 #'
-#' Estimates a single correlation matrix under the assumption that asset correlations are constant over time.
-#' This model does not include regime switching or exogenous covariates.
+#' Estimates a single (time-invariant) correlation matrix assuming asset correlations
+#' are constant over time. No regime switching or exogenous covariates are used.
+#' Optimization uses a global stage (\pkg{DEoptim}) followed by local refinement
+#' (L-BFGS-B via \code{stats::optim}).
 #'
-#' Estimation is performed by maximizing the log-likelihood of a multivariate normal distribution
-#' with constant correlation, using differential evolution followed by L-BFGS-B optimization.
+#' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals or
+#'   returns (columns treated as mean-zero with unit variance).
+#' @param control Optional list for basic verbosity control, currently supporting
+#'   \code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
+#'   are set internally.
 #'
-#' @param residuals A numeric matrix of dimension T × K. Typically standardized residuals or returns.
-#' @param control Optional list of control parameters passed to the DEoptim optimizer (e.g., \code{do_trace = TRUE}).
-#'
-#' @return A list with the following components:
+#' @returns A list with:
 #' \describe{
-#'   \item{transition_matrix}{A 1 × 1 matrix with value 1 (since there is no switching).}
-#'   \item{means}{A placeholder matrix of zeros (1 × K) for the regime mean (not estimated).}
-#'   \item{volatilities}{A placeholder matrix of ones (1 × K) for the regime volatility (not estimated).}
-#'   \item{correlations}{A 1 × C matrix of estimated correlation coefficients, where C = K(K−1)/2.}
-#'   \item{covariances}{A 3D array of dimension K × K × 1 containing the full correlation matrix.}
-#'   \item{log_likelihood}{The log-likelihood value of the fitted constant-correlation model.}
-#'   \item{beta}{\code{NULL} (no covariates used).}
+#'   \item{transition_matrix}{\eqn{1 \times 1} matrix equal to 1 (no switching).}
+#'   \item{means}{\eqn{1 \times K} zeros (placeholders; means are not estimated).}
+#'   \item{volatilities}{\eqn{1 \times K} ones (placeholders; vols are not estimated).}
+#'   \item{correlations}{\eqn{1 \times C} vector of lower-triangular correlations,
+#'     where \eqn{C = K(K-1)/2}.}
+#'   \item{covariances}{Array \eqn{K \times K \times 1} with the full correlation matrix.}
+#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+#'   \item{beta}{\code{NULL} (no covariates).}
 #' }
 #'
-#' @importFrom DEoptim DEoptim
+#' @details
+#' \itemize{
+#'   \item \strong{Parameterization:} the free parameters are the \eqn{C = K(K-1)/2}
+#'         pairwise correlations stacked in \code{lower.tri} order.
+#'   \item \strong{Bounds / PD checks:} elementwise bounds \eqn{\rho \in (-1, 1)};
+#'         non–positive-definite proposals are penalized in the objective.
+#'   \item \strong{Numerical safeguards:} a tiny ridge is added before inverting
+#'         the correlation matrix to improve stability.
+#'   \item \strong{Scaling:} since inputs are treated as unit-variance, only the
+#'         correlation structure is estimated.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(123)
+#' T <- 120; K <- 3
+#' y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
+#' fit <- f_optim_const(residuals = y)
+#' round(drop(fit$covariances[,,1]), 3)
+#' fit$correlations
+#' fit$log_likelihood
+#' }
+#'
+#' @seealso \code{\link{rsdc_estimate}} (wrapper),
+#'   \code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
+#'
+#' @references
+#'   Storn, R. & Price, K. (1997). Differential Evolution — a simple and efficient
+#'   heuristic for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+#'
+#' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+#'
+#' @importFrom stats optim
 f_optim_const <- function(residuals, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -351,30 +452,47 @@ f_optim_const <- function(residuals, control = list()) {
   )
 }
 
-#' Estimate Regime-Switching or Constant Correlation Model
+#' Estimate Regime-Switching or Constant Correlation Model (Wrapper)
 #'
-#' A unified wrapper function to estimate correlation models with or without regime switching,
-#' and with or without exogenous transition variables. This function delegates to one of:
+#' Unified front-end that dispatches to one of three estimators:
 #' \itemize{
-#'   \item \code{f_optim()} for regime switching with exogenous covariates (\code{method = "tvtp"})
-#'   \item \code{f_optim_noX()} for regime switching with fixed transition probabilities (\code{method = "noX"})
-#'   \item \code{f_optim_const()} for a constant correlation model with no regime switching (\code{method = "const"})
+#'   \item \code{f_optim()} — TVTP specification (\code{method = "tvtp"}).
+#'   \item \code{f_optim_noX()} — fixed transition matrix (\code{method = "noX"}).
+#'   \item \code{f_optim_const()} — constant correlation, single regime (\code{method = "const"}).
 #' }
 #'
-#' @param method Character string. One of:
-#'   \itemize{
-#'     \item \code{"tvtp"}: Regime switching with time-varying transition probabilities driven by \code{X}.
-#'     \item \code{"noX"}: Regime switching with constant transition probabilities (no covariates).
-#'     \item \code{"const"}: Constant correlation model (no regime switching or covariates).
-#'   }
-#' @param residuals A numeric matrix of dimension T × K. Typically standardized residuals or returns.
-#' @param N Integer. Number of regimes. Ignored if \code{method = "const"}.
-#' @param X A numeric matrix of exogenous covariates (T × p). Required only for \code{method = "tvtp"}.
-#' @param out_of_sample Logical. If \code{TRUE}, uses 70\% of the data for estimation and 30\% for out-of-sample analysis.
-#' @param control Optional list of control options. Currently supports \code{do_trace = TRUE} for verbose output during optimization.
+#' @param method Character. One of \code{"tvtp"}, \code{"noX"}, \code{"const"}.
+#' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals/returns.
+#' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
+#' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
+#' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
+#' @param control Optional list. Currently forwards \code{do_trace = TRUE} to the backends.
 #'
-#' @return A list containing the estimated model parameters. See the return values of
-#' \code{\link{f_optim}}, \code{\link{f_optim_noX}}, and \code{\link{f_optim_const}} for details.
+#' @return
+#' \describe{
+#'   \item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"}).}
+#'   \item{\code{correlations}}{Regime lower-triangular correlations.}
+#'   \item{\code{covariances}}{Array of full correlation matrices.}
+#'   \item{\code{log_likelihood}}{Maximized log-likelihood.}
+#'   \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}).}
+#' }
+#'
+#' @details
+#' \itemize{
+#'   \item \strong{Method selection:} \code{match.arg()} validates \code{method}.
+#'   \item \strong{Inputs:} \code{"tvtp"} requires non-NULL \code{X}; \code{N} is ignored for \code{"const"}.
+#'   \item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\% is used for fitting.
+#' }
+#'
+#' @examples
+#' y <- scale(matrix(rnorm(100 * 3), 100, 3))
+#' rsdc_estimate("const", residuals = y)
+#' rsdc_estimate("noX", residuals = y, N = 2)
+#' X <- cbind(1, scale(seq_len(nrow(y))))
+#' rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+#'
+#' @seealso \code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},
+#'   \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
 #' @export
 rsdc_estimate <- function(method = c("tvtp", "noX", "const"), residuals, N = 2, X = NULL, out_of_sample = FALSE, control = list()) {

@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_estimate.R
 \name{rsdc_estimate}
 \alias{rsdc_estimate}
-\title{Estimate Regime-Switching or Constant Correlation Model}
+\title{Estimate Regime-Switching or Constant Correlation Model (Wrapper)}
 \usage{
 rsdc_estimate(
   method = c("tvtp", "noX", "const"),
@@ -14,33 +14,51 @@ rsdc_estimate(
 )
 }
 \arguments{
-\item{method}{Character string. One of:
-\itemize{
-\item \code{"tvtp"}: Regime switching with time-varying transition probabilities driven by \code{X}.
-\item \code{"noX"}: Regime switching with constant transition probabilities (no covariates).
-\item \code{"const"}: Constant correlation model (no regime switching or covariates).
-}}
+\item{method}{Character. One of \code{"tvtp"}, \code{"noX"}, \code{"const"}.}
 
-\item{residuals}{A numeric matrix of dimension T × K. Typically standardized residuals or returns.}
+\item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals/returns.}
 
-\item{N}{Integer. Number of regimes. Ignored if \code{method = "const"}.}
+\item{N}{Integer. Number of regimes. Ignored when \code{method = "const"}.}
 
-\item{X}{A numeric matrix of exogenous covariates (T × p). Required only for \code{method = "tvtp"}.}
+\item{X}{Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).}
 
-\item{out_of_sample}{Logical. If \code{TRUE}, uses 70\\% of the data for estimation and 30\\% for out-of-sample analysis.}
+\item{out_of_sample}{Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.}
 
-\item{control}{Optional list of control options. Currently supports \code{do_trace = TRUE} for verbose output during optimization.}
+\item{control}{Optional list. Currently forwards \code{do_trace = TRUE} to the backends.}
 }
 \value{
-A list containing the estimated model parameters. See the return values of
-\code{\link{f_optim}}, \code{\link{f_optim_noX}}, and \code{\link{f_optim_const}} for details.
+\describe{
+\item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"}).}
+\item{\code{correlations}}{Regime lower-triangular correlations.}
+\item{\code{covariances}}{Array of full correlation matrices.}
+\item{\code{log_likelihood}}{Maximized log-likelihood.}
+\item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}).}
+}
 }
 \description{
-A unified wrapper function to estimate correlation models with or without regime switching,
-and with or without exogenous transition variables. This function delegates to one of:
+Unified front-end that dispatches to one of three estimators:
 \itemize{
-\item \code{f_optim()} for regime switching with exogenous covariates (\code{method = "tvtp"})
-\item \code{f_optim_noX()} for regime switching with fixed transition probabilities (\code{method = "noX"})
-\item \code{f_optim_const()} for a constant correlation model with no regime switching (\code{method = "const"})
+\item \code{f_optim()} — TVTP specification (\code{method = "tvtp"}).
+\item \code{f_optim_noX()} — fixed transition matrix (\code{method = "noX"}).
+\item \code{f_optim_const()} — constant correlation, single regime (\code{method = "const"}).
 }
+}
+\details{
+\itemize{
+\item \strong{Method selection:} \code{match.arg()} validates \code{method}.
+\item \strong{Inputs:} \code{"tvtp"} requires non-NULL \code{X}; \code{N} is ignored for \code{"const"}.
+\item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\\% is used for fitting.
+}
+}
+\examples{
+y <- scale(matrix(rnorm(100 * 3), 100, 3))
+rsdc_estimate("const", residuals = y)
+rsdc_estimate("noX", residuals = y, N = 2)
+X <- cbind(1, scale(seq_len(nrow(y))))
+rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+
+}
+\seealso{
+\code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},
+\code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 }

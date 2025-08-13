@@ -2,50 +2,90 @@
 % Please edit documentation in R/model_fit.R
 \name{rsdc_likelihood}
 \alias{rsdc_likelihood}
-\title{Negative Log-Likelihood for Regime-Switching Correlation Model}
+\title{Negative Log-Likelihood for Regime-Switching Correlation Models}
 \usage{
 rsdc_likelihood(params, y, exog = NULL, K, N)
 }
 \arguments{
-\item{params}{A numeric vector of model parameters. This includes:
+\item{params}{Numeric vector of model parameters packed as:
 \itemize{
-\item If \code{exog} is \code{NULL}: \eqn{N(N-1)} transition probabilities (one per off-diagonal regime),
-followed by \eqn{N \cdot K(K-1)/2} correlation parameters.
-\item If \code{exog} is not \code{NULL}: \eqn{N \cdot p} logistic regression coefficients
-(where \code{p = ncol(exog)}), followed by \eqn{N \cdot K(K-1)/2} correlation parameters.
+\item \strong{No exogenous covariates} (\code{exog = NULL}): first
+\eqn{N(N-1)} transition parameters (for the fixed transition matrix),
+followed by \eqn{N \times K(K-1)/2} correlation parameters, stacked
+\emph{row-wise by regime} in \code{lower.tri} order.
+\item \strong{With exogenous covariates} (\code{exog} provided): first
+\eqn{N \times p} TVTP coefficients (\code{beta}, row \eqn{i} corresponds
+to regime \eqn{i}), followed by \eqn{N \times K(K-1)/2} correlation parameters,
+stacked \emph{row-wise by regime} in \code{lower.tri} order.
 }}
 
-\item{y}{A numeric matrix of dimension \eqn{T \times K}, where \eqn{T} is the number of time steps and
-\eqn{K} the number of observed variables (e.g., asset returns).}
+\item{y}{Numeric matrix \eqn{T \times K} of observations (e.g., standardized residuals).
+Columns are treated as mean-zero, unit-variance; only correlation is modeled.}
 
-\item{exog}{Optional. A numeric matrix of dimension \eqn{T \times p} of exogenous variables.
-If provided, a time-varying transition model is used.}
+\item{exog}{Optional numeric matrix \eqn{T \times p} of exogenous covariates.
+If supplied, a TVTP specification is used.}
 
-\item{K}{Integer. Number of observed variables (columns in \code{y}).}
+\item{K}{Integer. Number of observed series (columns of \code{y}).}
 
 \item{N}{Integer. Number of regimes.}
 }
 \value{
-A numeric scalar: the negative log-likelihood of the model (to be minimized).
+Numeric scalar: the \emph{negative} log-likelihood to be minimized by an optimizer.
 }
 \description{
-Computes the negative log-likelihood of a multivariate regime-switching correlation model,
-with either fixed or time-varying transition probabilities. The model assumes
-regime-specific correlation matrices and uses the Hamilton filter for likelihood evaluation.
+Computes the negative log-likelihood for a multivariate \emph{correlation-only}
+regime-switching model, with either a fixed (time-invariant) transition matrix or
+time-varying transition probabilities (TVTP) driven by exogenous covariates.
+Likelihood evaluation uses the Hamilton (1989) filter.
 }
 \details{
-The function evaluates the log-likelihood of the data under a regime-switching
-correlation model using the Hamilton filter. Two types of transition dynamics are supported:
 \itemize{
-\item \strong{Fixed transition matrix} when \code{exog = NULL}. Transition probabilities are estimated directly.
-\item \strong{Time-varying transition probabilities (TVTP)} when \code{exog} is provided. In this case,
-regime persistence probabilities are modeled via a logistic function:
-\deqn{p_{ii,t} = \frac{1}{1 + \exp(-X_t^\top \beta_i)}}
+\item \strong{Transition dynamics:}
+\itemize{
+\item \emph{Fixed P (no \code{exog}):} \code{params} begins with transition
+parameters. For \eqn{N=2}, the implementation maps them to
+\eqn{P=\begin{pmatrix} p_{11} & 1-p_{11}\\ 1-p_{22} & p_{22}\end{pmatrix}}.
+\item \emph{TVTP:} with \code{exog}, diagonal persistence is
+\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}; off-diagonals are equal
+and sum to \eqn{1-p_{ii,t}}.
 }
+\item \strong{Correlation build:} per regime, the lower-triangular vector is filled into
+a symmetric correlation matrix. Non–positive-definite proposals or \eqn{|\rho|\ge 1}
+are penalized via a large objective value.
+\item \strong{Evaluation:} delegates to \code{\link{rsdc_hamilton}}; if the filter returns
+\code{log_likelihood = -Inf}, a large penalty is returned.
+}
+}
+\note{
+The function is written for use inside optimizers; it performs inexpensive validation
+and returns large penalties for invalid parameterizations instead of stopping with errors.
+}
+\examples{
+# Small toy example (N = 2, K = 3), fixed P (no exog)
+set.seed(1)
+T <- 40; K <- 3; N <- 2
+y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
 
-The Hamilton filter computes the filtered and smoothed regime probabilities internally.
-The negative log-likelihood is returned for use in optimization routines.
+# Pack parameters: trans (p11, p22), then rho by regime (lower-tri order)
+p11 <- 0.9; p22 <- 0.8
+rho1 <- c(0.10, 0.05, 0.00)  # (2,1), (3,1), (3,2)
+rho2 <- c(0.60, 0.40, 0.30)
+params <- c(p11, p22, rho1, rho2)
+
+nll <- rsdc_likelihood(params, y = y, exog = NULL, K = K, N = N)
+nll
+
+# TVTP example: add X and beta (pack beta row-wise, then rho)
+X <- cbind(1, scale(seq_len(T)))
+beta <- rbind(c(1.2, 0.0),
+              c(0.8, -0.1))
+params_tvtp <- c(as.vector(t(beta)), rho1, rho2)
+nll_tvtp <- rsdc_likelihood(params_tvtp, y = y, exog = X, K = K, N = N)
+nll_tvtp
+
 }
 \seealso{
-\code{\link{rsdc_hamilton}}, \code{\link{optim}}, \code{\link{DEoptim}}, \code{\link{plogis}}
+\code{\link{rsdc_hamilton}} (filter), \code{\link{f_optim}} (TVTP estimator),
+\code{\link{f_optim_noX}} (fixed-\emph{P} estimator), \code{\link{f_optim_const}} (constant correlation),
+\code{\link[stats]{optim}}, \code{\link[DEoptim]{DEoptim}}
 }

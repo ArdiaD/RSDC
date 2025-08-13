@@ -2,32 +2,69 @@
 % Please edit documentation in R/model_estimate.R
 \name{f_optim_const}
 \alias{f_optim_const}
-\title{Estimate Constant Correlation Model}
+\title{Constant-Correlation Model (Single Regime)}
 \usage{
 f_optim_const(residuals, control = list())
 }
 \arguments{
-\item{residuals}{A numeric matrix of dimension T × K. Typically standardized residuals or returns.}
+\item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals or
+returns (columns treated as mean-zero with unit variance).}
 
-\item{control}{Optional list of control parameters passed to the DEoptim optimizer (e.g., \code{do_trace = TRUE}).}
+\item{control}{Optional list for basic verbosity control, currently supporting
+\code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
+are set internally.}
 }
 \value{
-A list with the following components:
+A list with:
 \describe{
-\item{transition_matrix}{A 1 × 1 matrix with value 1 (since there is no switching).}
-\item{means}{A placeholder matrix of zeros (1 × K) for the regime mean (not estimated).}
-\item{volatilities}{A placeholder matrix of ones (1 × K) for the regime volatility (not estimated).}
-\item{correlations}{A 1 × C matrix of estimated correlation coefficients, where C = K(K−1)/2.}
-\item{covariances}{A 3D array of dimension K × K × 1 containing the full correlation matrix.}
-\item{log_likelihood}{The log-likelihood value of the fitted constant-correlation model.}
-\item{beta}{\code{NULL} (no covariates used).}
+\item{transition_matrix}{\eqn{1 \times 1} matrix equal to 1 (no switching).}
+\item{means}{\eqn{1 \times K} zeros (placeholders; means are not estimated).}
+\item{volatilities}{\eqn{1 \times K} ones (placeholders; vols are not estimated).}
+\item{correlations}{\eqn{1 \times C} vector of lower-triangular correlations,
+where \eqn{C = K(K-1)/2}.}
+\item{covariances}{Array \eqn{K \times K \times 1} with the full correlation matrix.}
+\item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+\item{beta}{\code{NULL} (no covariates).}
 }
 }
 \description{
-Estimates a single correlation matrix under the assumption that asset correlations are constant over time.
-This model does not include regime switching or exogenous covariates.
+Estimates a single (time-invariant) correlation matrix assuming asset correlations
+are constant over time. No regime switching or exogenous covariates are used.
+Optimization uses a global stage (\pkg{DEoptim}) followed by local refinement
+(L-BFGS-B via \code{stats::optim}).
 }
 \details{
-Estimation is performed by maximizing the log-likelihood of a multivariate normal distribution
-with constant correlation, using differential evolution followed by L-BFGS-B optimization.
+\itemize{
+\item \strong{Parameterization:} the free parameters are the \eqn{C = K(K-1)/2}
+pairwise correlations stacked in \code{lower.tri} order.
+\item \strong{Bounds / PD checks:} elementwise bounds \eqn{\rho \in (-1, 1)};
+non–positive-definite proposals are penalized in the objective.
+\item \strong{Numerical safeguards:} a tiny ridge is added before inverting
+the correlation matrix to improve stability.
+\item \strong{Scaling:} since inputs are treated as unit-variance, only the
+correlation structure is estimated.
+}
+}
+\note{
+Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+}
+\examples{
+\dontrun{
+set.seed(123)
+T <- 120; K <- 3
+y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
+fit <- f_optim_const(residuals = y)
+round(drop(fit$covariances[,,1]), 3)
+fit$correlations
+fit$log_likelihood
+}
+
+}
+\references{
+Storn, R. & Price, K. (1997). Differential Evolution — a simple and efficient
+heuristic for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+}
+\seealso{
+\code{\link{rsdc_estimate}} (wrapper),
+\code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
 }

@@ -2,52 +2,94 @@
 % Please edit documentation in R/model_fit.R
 \name{rsdc_hamilton}
 \alias{rsdc_hamilton}
-\title{Hamilton Filter with Time-Varying or Fixed Transition Probabilities}
+\title{Hamilton Filter (Fixed P or TVTP)}
 \usage{
 rsdc_hamilton(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL)
 }
 \arguments{
-\item{y}{A numeric matrix of dimension T × K containing the observed time series (e.g., standardized residuals).}
+\item{y}{Numeric matrix \eqn{T \times K} of observations (e.g., standardized residuals/returns).
+Columns are treated as mean-zero with unit variance; only the correlation structure is modeled.}
 
-\item{X}{An optional numeric matrix of dimension T × p of exogenous covariates used for TVTP.
-Required if \code{beta} is provided.}
+\item{X}{Optional numeric matrix \eqn{T \times p} of covariates for TVTP. Required if \code{beta} is supplied.}
 
-\item{beta}{An optional numeric matrix of dimension N × p. Logistic regression coefficients governing
-the regime-specific persistence probabilities in the TVTP specification.}
+\item{beta}{Optional numeric matrix \eqn{N \times p}. TVTP coefficients; row \eqn{i} governs
+persistence of regime \eqn{i} via \code{plogis(X[t, ] \%*\% beta[i, ])}.}
 
-\item{rho_matrix}{A numeric matrix of dimension N × C, where C = K(K−1)/2.
-Each row contains the lower-triangular correlation parameters for one regime.}
+\item{rho_matrix}{Numeric matrix \eqn{N \times C} of regime correlation parameters, where
+\eqn{C = K(K-1)/2}. Each row is the lower-triangular part (by \code{lower.tri}) of a regime's
+correlation matrix.}
 
-\item{K}{Integer. Number of observed variables.}
+\item{K}{Integer. Number of observed series (columns of \code{y}).}
 
 \item{N}{Integer. Number of regimes.}
 
-\item{P}{An optional N × N fixed transition matrix (used when \code{X} and \code{beta} are \code{NULL}).}
+\item{P}{Optional \eqn{N \times N} fixed transition matrix. Used only when \code{X} or \code{beta} is \code{NULL}.}
 }
 \value{
-A list with components:
+A list with:
 \describe{
-\item{filtered_probs}{A numeric matrix of dimension N × T.
-Contains the filtered regime probabilities \eqn{\Pr(S_t = j \mid \Omega_t)}.}
-\item{smoothed_probs}{A numeric matrix of dimension N × T.
-Contains the smoothed regime probabilities \eqn{\Pr(S_t = j \mid \Omega_T)}.}
-\item{log_likelihood}{The scalar log-likelihood value of the model given the data.}
+\item{filtered_probs}{\eqn{N \times T} matrix of filtered probabilities
+\eqn{\Pr(S_t = j \mid \Omega_t)}.}
+\item{smoothed_probs}{\eqn{N \times T} matrix of smoothed probabilities
+\eqn{\Pr(S_t = j \mid \Omega_T)}.}
+\item{log_likelihood}{Scalar log-likelihood of the model given \code{y}.}
 }
 }
 \description{
-Implements the Hamilton filter for a multivariate time series under a regime-switching correlation model.
-Supports both fixed transition probabilities and time-varying transition probabilities (TVTP)
-modeled via logistic functions of exogenous covariates.
+Runs the Hamilton (1989) filter for a multivariate regime-switching \emph{correlation} model.
+Supports either a fixed (time-invariant) transition matrix \eqn{P} or time-varying transition
+probabilities (TVTP) built from exogenous covariates \code{X} via a logistic link.
+Returns filtered/smoothed regime probabilities and the log-likelihood.
 }
 \details{
-The function computes the filtered and smoothed probabilities of the latent regime sequence, and
-evaluates the log-likelihood under the specified model.
+\itemize{
+\item \strong{Correlation rebuild:} For regime \eqn{m}, a correlation matrix \eqn{R_m} is reconstructed
+from \code{rho_matrix[m, ]} (lower-triangular fill + symmetrization). Non-PD proposals are penalized.
+\item \strong{Transition dynamics:}
+\itemize{
+\item \emph{Fixed P:} If \code{X} or \code{beta} is missing, a constant \eqn{P} is used
+(user-provided via \code{P}; otherwise uniform \eqn{1/N} rows).
+\item \emph{TVTP:} With \code{X} and \code{beta}, diagonal entries use
+\code{plogis(X[t, ] \%*\% beta[i, ])}. Off-diagonals are equal and sum to \eqn{1 - p_{ii,t}}.
+For \eqn{N=1}, \eqn{P_t = [1]}.
+}
+\item \strong{Numerical safeguards:} A small ridge is added before inversion; if filtering
+degenerates at a time step, \code{log_likelihood = -Inf} is returned.
+}
+}
+\note{
+TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
+}
+\examples{
+set.seed(1)
+T <- 50; K <- 3; N <- 2
+y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
 
-When \code{X} and \code{beta} are both provided, the function builds a time-varying transition
-matrix \eqn{\Pi_t} using a logistic specification for the diagonal elements, and equal off-diagonal
-probabilities. When omitted, the transition matrix is either fixed (if \code{P} is supplied)
-or assumed uniform (if \code{P} is \code{NULL}).
+# Example rho: two regimes with different average correlations
+rho <- rbind(c(0.10, 0.05, 0.00),
+             c(0.60, 0.40, 0.30))  # lower-tri order for K=3
 
-The correlation matrices are reconstructed from the lower-triangular parameters in \code{rho_matrix}.
-The likelihood is computed using multivariate normal densities with mean zero and unit variance.
+# Fixed-P filtering
+Pfix <- matrix(c(0.9, 0.1,
+                 0.2, 0.8), nrow = 2, byrow = TRUE)
+out_fix <- rsdc_hamilton(y = y, X = NULL, beta = NULL,
+                         rho_matrix = rho, K = K, N = N, P = Pfix)
+str(out_fix$filtered_probs)
+
+# TVTP filtering (include an intercept yourself)
+X <- cbind(1, scale(seq_len(T)))
+beta <- rbind(c(1.2, 0.0),
+              c(0.8, -0.1))
+out_tvtp <- rsdc_hamilton(y = y, X = X, beta = beta,
+                          rho_matrix = rho, K = K, N = N)
+out_tvtp$log_likelihood
+
+}
+\references{
+Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
+and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+}
+\seealso{
+\code{\link{rsdc_likelihood}}, \code{\link{f_optim}}, \code{\link{f_optim_noX}},
+\code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}
 }

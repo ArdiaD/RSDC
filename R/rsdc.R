@@ -1,37 +1,56 @@
 #' @name RSDC
 #' @aliases RSDC-package
 #' @title RSDC: Regime-Switching Correlation Models for Portfolio Analysis
+#'
 #' @description
-#' \code{RSDC} is an R package for modeling and comparing correlation structures across regimes in multivariate time series.
-#' It implements a regime-switching correlation framework with or without exogenous variables in the transition probabilities
-#' (Time-Varying Transition Probabilities – TVTP), and allows full pipeline integration including model fitting, covariance
-#' reconstruction, and portfolio optimization (e.g., minimum variance, maximum diversification).
+#' The \pkg{RSDC} package provides a comprehensive framework for modeling,
+#' estimating, and forecasting correlation structures in multivariate time
+#' series under regime-switching dynamics. It supports both fixed transition
+#' probabilities and \emph{time-varying transition probabilities} (TVTP)
+#' driven by exogenous variables.
 #'
-#' The package is designed for empirical asset pricing and portfolio applications, and supports the inclusion of predictors
-#' such as macroeconomic or climate-related indices to investigate time-varying market regimes.
+#' The methodology is particularly suited to empirical asset pricing and
+#' portfolio management applications, enabling users to incorporate macroeconomic,
+#' financial, or climate-related predictors into the regime dynamics. The package
+#' integrates the full workflow — from model estimation to covariance matrix
+#' reconstruction and portfolio optimization — in a single, reproducible pipeline.
 #'
-#' @section Functions:
+#' @section Main Features:
 #' \itemize{
-#'   \item Model estimation and filtering: \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}, \code{\link{rsdc_estimate}};
-#'   \item Correlation forecasting: \code{\link{rsdc_forecast}};
-#'   \item Portfolio construction: \code{\link{rsdc_minvar}}, \code{\link{rsdc_maxdiv}};
-#'   \item Complete simulation pipeline: \code{\link{rsdc_simulate}};
+#'   \item \strong{Model estimation and filtering:}
+#'     \code{\link{rsdc_hamilton}} (Hamilton filter),
+#'     \code{\link{rsdc_likelihood}} (likelihood computation),
+#'     \code{\link{rsdc_estimate}} (parameter estimation).
+#'   \item \strong{Correlation and covariance forecasting:}
+#'     \code{\link{rsdc_forecast}}.
+#'   \item \strong{Portfolio construction:}
+#'     \code{\link{rsdc_minvar}} (minimum-variance portfolios),
+#'     \code{\link{rsdc_maxdiv}} (maximum-diversification portfolios).
+#'   \item \strong{Simulation:}
+#'     \code{\link{rsdc_simulate}} (simulate TVTP regime-switching series).
 #' }
 #'
-#' @section Update:
-#' The latest version of the package is available at \url{https://github.com/ArdiaD/RegimeSwitchingCorrelation}
+#' @section Availability:
+#' The latest development version is hosted at
+#' \url{https://github.com/ArdiaD/RegimeSwitchingCorrelation}.
 #'
-#' @author David Ardia and Benjamin Seguin
+#' @section Authors:
+#' David Ardia and Benjamin Seguin
 #'
-#' @note By using \code{RSDC}, you agree to the following:
-#' (1) You must include a link to \url{https://CRAN.R-project.org/package=RSDC} in any publication or documentation;
-#' (2) You assume full responsibility for the interpretation and use of the results.
+#' @section Disclaimer:
+#' By using \pkg{RSDC}, you agree to:
+#' \enumerate{
+#'   \item Include a citation to \pkg{RSDC} in any publication or documentation
+#'         (\url{https://CRAN.R-project.org/package=RSDC}).
+#'   \item Assume full responsibility for the interpretation and use of results.
+#' }
 #'
 #' @references
-#'
-#' Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series and the business cycle.
-#' \emph{Econometrica}, \bold{57}(2), 357--384.
+#' Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
+#' and the business cycle. \emph{Econometrica}, \bold{57}(2), 357–384.
 #'
 #' @importFrom DEoptim DEoptim
+#' @importFrom stats optim plogis cor sd
+#' @importFrom utils combn
 NULL
 

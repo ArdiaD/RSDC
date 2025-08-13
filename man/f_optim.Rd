@@ -2,37 +2,75 @@
 % Please edit documentation in R/model_estimate.R
 \name{f_optim}
 \alias{f_optim}
-\title{Estimate Regime-Switching Correlation Model with TVTP}
+\title{Regime-Switching Correlation (TVTP) — DEoptim + L-BFGS-B}
 \usage{
 f_optim(N, residuals, X, out_of_sample = FALSE, control = list())
 }
 \arguments{
 \item{N}{Integer. Number of regimes.}
 
-\item{residuals}{A numeric matrix of dimension T × K. Typically standardized residuals or returns.}
+\item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals or returns
+(unit variance per column is assumed).}
 
-\item{X}{A numeric matrix of dimension T × p. Exogenous variables used to drive the transition probabilities.
-Must include a column of ones if an intercept is desired (not added automatically).}
+\item{X}{Numeric matrix \eqn{T \times p} of exogenous covariates driving TVTP.
+Include an intercept column yourself if desired (no automatic intercept).}
 
-\item{out_of_sample}{Logical. If \code{TRUE}, the first 70\\% of the data is used for estimation,
-and the remaining 30\\% is reserved for out-of-sample forecasting.}
+\item{out_of_sample}{Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the remainder is
+held out (indices are fixed by a 70/30 split).}
 
-\item{control}{Optional list of control arguments (e.g., \code{do_trace = TRUE}) passed to internal DEoptim control.}
+\item{control}{Optional list. Currently supports \code{do_trace = TRUE} to print optimizer progress.
+(Algorithmic hyperparameters are set internally.)}
 }
 \value{
-A list with the following components:
+A list with:
 \describe{
-\item{transition_matrix}{The average regime transition matrix evaluated at the mean of \code{X}.}
-\item{means}{A placeholder matrix of zeros (N × K) for regime-specific means (not estimated).}
-\item{volatilities}{A placeholder matrix of ones (N × K) for regime-specific volatilities (not estimated).}
-\item{correlations}{A matrix of regime-specific correlation coefficients (N × C),
-where C = K(K−1)/2 is the number of unique pairwise correlations.}
-\item{covariances}{An array of full correlation matrices for each regime (K × K × N).}
-\item{log_likelihood}{The log-likelihood of the fitted model.}
-\item{beta}{Matrix of estimated logistic regression coefficients for the TVTP specification (N × p).}
+\item{transition_matrix}{Average \eqn{N \times N} transition matrix evaluated at \code{colMeans(X)}.}
+\item{means}{\eqn{N \times K} zeros (placeholders; means are not estimated).}
+\item{volatilities}{\eqn{N \times K} ones (placeholders; vols are not estimated).}
+\item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations, \eqn{C = K(K-1)/2}.}
+\item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
+\item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+\item{beta}{\eqn{N \times p} matrix of TVTP coefficients.}
 }
 }
 \description{
-Fits a multivariate regime-switching model with time-varying transition probabilities (TVTP),
-using differential evolution followed by L-BFGS-B optimization.
+Estimates a multivariate correlation model with \emph{time-varying transition probabilities} (TVTP).
+Regime persistence \eqn{p_{ii,t}} is modeled via a logistic link on exogenous covariates \code{X};
+off-diagonal transition probabilities are set equal to \eqn{(1 - p_{ii,t})/(N-1)}. Correlations are
+regime-specific and reconstructed from lower-triangular parameters. Optimization uses global search
+(\pkg{DEoptim}) followed by local refinement (L-BFGS-B).
+}
+\details{
+\itemize{
+\item \strong{TVTP parameterization:} diagonal entries use \code{plogis(X \%*\% beta[i, ])};
+off-diagonals are equal and sum to one.
+\item \strong{Bounds:} \eqn{\beta \in [-10, 10]} elementwise; correlations \eqn{\in (-1, 1)}.
+\item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
+\item \strong{Numerical safeguards:} tiny ridge is added in inverses; non-PD proposals are penalized.
+}
+}
+\note{
+Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
+}
+\section{Assumptions}{
+
+Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation structure is estimated.
+}
+
+\examples{
+\dontrun{
+T <- 60; K <- 3; N <- 2
+y <- matrix(rnorm(T * K), T, K)
+X <- cbind(1, scale(seq_len(T)))
+fit <- f_optim(N = N, residuals = y, X = X)
+str(fit$correlations)
+}
+
+}
+\references{
+Hamilton, J. D. (1989). \emph{Econometrica}, 57(2), 357–384. (Regime filtering)
+Storn, R. & Price, K. (1997). \emph{J. Global Optimization}, 11(4), 341–359. (DE)
+}
+\seealso{
+\code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
 }
