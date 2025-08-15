@@ -87,7 +87,7 @@ out_tvtp$log_likelihood
 }
 \references{
 Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+and the business cycle. \emph{Econometrica}, 57(2), 357-384.
 }
 \seealso{
 \code{\link{rsdc_likelihood}}, \code{\link{f_optim}}, \code{\link{f_optim_noX}},

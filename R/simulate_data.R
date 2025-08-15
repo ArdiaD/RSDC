@@ -73,7 +73,7 @@
 #'
 #' @references
 #'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#'   and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+#'   and the business cycle. \emph{Econometrica}, 57(2), 357-384.
 #'
 #' @note Requires \pkg{mvtnorm} for multivariate normal sampling (called as \code{mvtnorm::rmvnorm}).
 #'
@@ -88,9 +88,9 @@ rsdc_simulate <- function(n, X, beta, mu, sigma, N, seed = NULL) {
   K <- ncol(mu)
   p <- ncol(X)
 
-  if (!all(dim(beta) == c(N, N, p))) stop("beta must be an array of dim N × N × p")
-  if (!all(dim(mu) == c(N, K))) stop("mu must be a matrix of dim N × K")
-  if (!all(dim(sigma) == c(K, K, N))) stop("sigma must be an array of dim K × K × N")
+  if (!all(dim(beta) == c(N, N, p))) stop("beta must be an array of dim N x N x p")
+  if (!all(dim(mu) == c(N, K))) stop("mu must be a matrix of dim N x K")
+  if (!all(dim(sigma) == c(K, K, N))) stop("sigma must be an array of dim K x K x N")
 
   states <- numeric(n)
   observations <- matrix(NA, nrow = n, ncol = K)

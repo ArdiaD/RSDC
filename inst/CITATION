@@ -1,24 +1,13 @@
-if (!exists("meta") || is.null(meta)) meta <- packageDescription("RSDC")
-year <- sub(".*(2[[:digit:]]{3})-.*", "\\1", meta$Date)
-vers <- paste("R package version", meta$Version)
-
 citHeader("To cite 'RSDC' in publications use:")
 
-bibentry(
-  bibtype = "Manual",
-  title   = "RSDC: Regime-Switching Dynamic Correlation Models",
-  author  = c(
-    person("David", "Ardia"),
-    person("Benjamin", "Seguin")
-  ),
-  year   = year,
-  note   = vers,
+bibentry(bibtype = "Manual",
+  title   = "RSDC: Regime-Switching Dynamic Correlation Models in R",
+  author  = c(person("David", "Ardia"),
+              person("Benjamin", "Seguin")),
+  year   = "2025",
+  note   = "R package version 1.1-0",
   organization = "CRAN",
-  url    = "https://CRAN.R-project.org/package=RSDC",
-  textVersion = paste(
-    "Ardia, D., Seguin, B. (", year, ").",
-    "RSDC: Regime-Switching Dynamic Correlation Models.",
-    vers, ".",
-    "Retrieved from https://CRAN.R-project.org/package=RSDC"
-  )
+  textVersion = paste("Ardia, D., Seguin, B. (2025).",
+    "RSDC: Regime-Switching Dynamic Correlation Models in R.",
+    "R package version 1.1-0.")
 )

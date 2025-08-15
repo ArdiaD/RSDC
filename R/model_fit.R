@@ -71,7 +71,7 @@
 #'
 #' @references
 #'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#'   and the business cycle. \emph{Econometrica}, 57(2), 357–384.
+#'   and the business cycle. \emph{Econometrica}, 57(2), 357-384.
 #'
 #' @note TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
 #'
@@ -83,10 +83,10 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
   if (!is.null(X) && !is.matrix(X)) stop("X must be a numeric matrix or NULL.")
   if (!is.null(beta) && (!is.matrix(beta) || nrow(beta) != N)) stop("beta must be a matrix with N rows.")
   if (!is.matrix(rho_matrix) || nrow(rho_matrix) != N || ncol(rho_matrix) != K*(K - 1)/2) {
-    stop("rho_matrix must be of dimension N × (K*(K-1)/2).")
+    stop("rho_matrix must be of dimension N x (K*(K-1)/2).")
   }
   if (!is.null(P) && (!is.matrix(P) || !all(dim(P) == c(N, N)))) {
-    stop("P must be an N × N matrix if provided.")
+    stop("P must be an N x N matrix if provided.")
   }
 
   T <- nrow(y)
@@ -235,7 +235,7 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #'                 and sum to \eqn{1-p_{ii,t}}.
 #'         }
 #'   \item \strong{Correlation build:} per regime, the lower-triangular vector is filled into
-#'         a symmetric correlation matrix. Non–positive-definite proposals or \eqn{|\rho|\ge 1}
+#'         a symmetric correlation matrix. Non-positive-definite proposals or \eqn{|\rho|\ge 1}
 #'         are penalized via a large objective value.
 #'   \item \strong{Evaluation:} delegates to \code{\link{rsdc_hamilton}}; if the filter returns
 #'         \code{log_likelihood = -Inf}, a large penalty is returned.

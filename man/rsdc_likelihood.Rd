@@ -50,7 +50,7 @@ parameters. For \eqn{N=2}, the implementation maps them to
 and sum to \eqn{1-p_{ii,t}}.
 }
 \item \strong{Correlation build:} per regime, the lower-triangular vector is filled into
-a symmetric correlation matrix. Non–positive-definite proposals or \eqn{|\rho|\ge 1}
+a symmetric correlation matrix. Non-positive-definite proposals or \eqn{|\rho|\ge 1}
 are penalized via a large objective value.
 \item \strong{Evaluation:} delegates to \code{\link{rsdc_hamilton}}; if the filter returns
 \code{log_likelihood = -Inf}, a large penalty is returned.
