@@ -1,4 +1,4 @@
-# RegimeSwitchingDynamicCorrelation
+# RSCD: Regime-Switching Dynamic Correlation Models in R
 
 **RSDC** is an R package for modeling time-varying asset correlations through a regime-switching framework. It supports flexible multivariate correlation dynamics with either fixed or time-varying transition probabilities (TVTP) driven by exogenous covariates.
 
