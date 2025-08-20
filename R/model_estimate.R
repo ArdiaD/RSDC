@@ -386,51 +386,57 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
 #' @importFrom stats optim
-f_optim_const <- function(residuals, control = list()) {
+f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
   con <- list(do_trace = FALSE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
-  T <- nrow(residuals)
   n_rho <- K * (K - 1) / 2
-
-  bounds <- list(
-    lower = rep(-1, n_rho),
-    upper = rep(1, n_rho)
-  )
 
   neg_loglik_const <- function(rho_vec, y, K) {
     R <- diag(K)
     R[lower.tri(R)] <- rho_vec
     R[upper.tri(R)] <- t(R)[upper.tri(R)]
+    # PD check
+    eig <- tryCatch(eigen(R, only.values = TRUE)$values, error = function(e) NA_real_)
+    if (any(!is.finite(eig)) || min(eig) < 1e-8) return(1e10)
 
-    if (min(eigen(R)$values) < 1e-6) return(1e10)
-
-    inv_R <- solve(R + diag(1e-8, K))
-    log_det <- determinant(R, logarithm = TRUE)$modulus[1]
-    quad_terms <- rowSums((y %*% inv_R) * y)
-    ll <- -0.5 * sum(log_det + quad_terms + K * log(2 * pi))
-    return(-ll)
+    inv_R  <- solve(R + diag(1e-8, K))
+    logdet <- determinant(R, logarithm = TRUE)$modulus[1]
+    quad   <- rowSums((y %*% inv_R) * y)
+    # negative log-likelihood
+    return(-(-0.5 * sum(logdet + quad + K * log(2 * pi))))
   }
 
+  # Split (if requested)
+  if (out_of_sample) {
+    cut <- round(0.7 * nrow(residuals))
+    y_is  <- residuals[1:cut, , drop = FALSE]
+    y_oos <- residuals[(cut + 1):nrow(residuals), , drop = FALSE]
+  } else {
+    y_is  <- residuals
+    y_oos <- NULL
+  }
+
+  # Fit on IS only
   set.seed(123)
   de_result <- DEoptim::DEoptim(
     fn = neg_loglik_const,
-    lower = bounds$lower,
-    upper = bounds$upper,
+    lower = rep(-1, n_rho),
+    upper = rep(1, n_rho),
     control = list(itermax = 500, trace = con$do_trace),
-    y = residuals, K = K
+    y = y_is, K = K
   )
 
   optim_result <- optim(
     par = de_result$optim$bestmem,
     fn = neg_loglik_const,
     method = "L-BFGS-B",
-    lower = bounds$lower,
-    upper = bounds$upper,
-    y = residuals, K = K,
+    lower = rep(-1, n_rho),
+    upper = rep(1, n_rho),
+    y = y_is, K = K,
     control = list(maxit = 1000)
   )
 
@@ -438,16 +444,22 @@ f_optim_const <- function(residuals, control = list()) {
   R <- diag(K)
   R[lower.tri(R)] <- rho_vec
   R[upper.tri(R)] <- t(R)[upper.tri(R)]
-
   array_R <- array(R, dim = c(K, K, 1))
+
+  # Single returned likelihood depending on the flag
+  ll_return <- if (out_of_sample) {
+    -neg_loglik_const(rho_vec, y_oos, K)  # OOS ll
+  } else {
+    -optim_result$value                   # IS ll
+  }
 
   list(
     transition_matrix = matrix(1, 1, 1),
-    means = matrix(0, 1, K),
+    means        = matrix(0, 1, K),
     volatilities = matrix(1, 1, K),
     correlations = matrix(rho_vec, nrow = 1),
-    covariances = array_R,
-    log_likelihood = -optim_result$value,
+    covariances  = array_R,
+    log_likelihood = ll_return,
     beta = NULL
   )
 }
@@ -495,7 +507,9 @@ f_optim_const <- function(residuals, control = list()) {
 #'   \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
 #' @export
-rsdc_estimate <- function(method = c("tvtp", "noX", "const"), residuals, N = 2, X = NULL, out_of_sample = FALSE, control = list()) {
+rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
+                          residuals, N = 2, X = NULL,
+                          out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
 
   con <- list(do_trace = FALSE)
@@ -511,7 +525,8 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"), residuals, N = 2, 
   }
 
   if (method == "const") {
-    return(f_optim_const(residuals = residuals, control = list(do_trace = con$do_trace)))
+    return(f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
+                         control = list(do_trace = con$do_trace)))
   }
 
   stop("Unknown method: ", method)

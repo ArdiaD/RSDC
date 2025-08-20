@@ -4,7 +4,7 @@
 \alias{f_optim_const}
 \title{Constant-Correlation Model (Single Regime)}
 \usage{
-f_optim_const(residuals, control = list())
+f_optim_const(residuals, out_of_sample = FALSE, control = list())
 }
 \arguments{
 \item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals or
