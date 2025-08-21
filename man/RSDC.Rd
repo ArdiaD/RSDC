@@ -37,22 +37,12 @@ reconstruction and portfolio optimization — in a single, reproducible pipeline
 \section{Availability}{
 
 The latest development version is hosted at
-\url{https://github.com/ArdiaD/RegimeSwitchingCorrelation}.
+\url{https://github.com/ArdiaD/RSDC}.
 }
 
 \section{Authors}{
 
 David Ardia and Benjamin Seguin
-}
-
-\section{Disclaimer}{
-
-By using \pkg{RSDC}, you agree to:
-\enumerate{
-\item Include a citation to \pkg{RSDC} in any publication or documentation
-(\url{https://CRAN.R-project.org/package=RSDC}).
-\item Assume full responsibility for the interpretation and use of results.
-}
 }
 
 \references{

@@ -24,7 +24,7 @@ devtools::install_github("ArdiaD/RSDC")
 By using **RSDC**, you agree to the following:
 
 1. Include a footnote or reference to the GitHub page:  
-   [https://github.com/ArdiaD/RegimeSwitchingCorrelation](https://github.com/ArdiaD/RegimeSwitchingCorrelation)  
+   [https://github.com/ArdiaD/RSDC](https://github.com/ArdiaD/RSDC)  
 2. You assume all risk for using this software.
 
 ## References
