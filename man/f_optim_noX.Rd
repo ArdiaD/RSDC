@@ -68,10 +68,9 @@ fit$correlations
 
 }
 \references{
-Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-and the business cycle. \emph{Econometrica}, 57(2), 357–384.
-Storn, R. & Price, K. (1997). Differential Evolution – A simple and efficient heuristic
-for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+\insertRef{R-DEoptim}{RSDC}
+\insertRef{DEoptim-JSS}{RSDC}
+\insertRef{hamilton1989}{RSDC}
 }
 \seealso{
 \code{\link{f_optim}} (TVTP), \code{\link{f_optim_const}} (constant correlation),

@@ -61,6 +61,7 @@ The function is written for use inside optimizers; it performs inexpensive valid
 and returns large penalties for invalid parameterizations instead of stopping with errors.
 }
 \examples{
+\dontrun{
 # Small toy example (N = 2, K = 3), fixed P (no exog)
 set.seed(1)
 T <- 40; K <- 3; N <- 2
@@ -82,6 +83,7 @@ beta <- rbind(c(1.2, 0.0),
 params_tvtp <- c(as.vector(t(beta)), rho1, rho2)
 nll_tvtp <- rsdc_likelihood(params_tvtp, y = y, exog = X, K = K, N = N)
 nll_tvtp
+}
 
 }
 \seealso{

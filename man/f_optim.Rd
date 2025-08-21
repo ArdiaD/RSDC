@@ -68,8 +68,9 @@ str(fit$correlations)
 
 }
 \references{
-Hamilton, J. D. (1989). \emph{Econometrica}, 57(2), 357–384. (Regime filtering)
-Storn, R. & Price, K. (1997). \emph{J. Global Optimization}, 11(4), 341–359. (DE)
+\insertRef{R-DEoptim}{RSDC}
+\insertRef{DEoptim-JSS}{RSDC}
+\insertRef{hamilton1989}{RSDC}
 }
 \seealso{
 \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}

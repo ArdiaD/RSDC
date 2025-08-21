@@ -51,12 +51,20 @@ Unified front-end that dispatches to one of three estimators:
 }
 }
 \examples{
+\dontrun{
 y <- scale(matrix(rnorm(100 * 3), 100, 3))
 rsdc_estimate("const", residuals = y)
 rsdc_estimate("noX", residuals = y, N = 2)
 X <- cbind(1, scale(seq_len(nrow(y))))
 rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+}
 
+}
+\references{
+\insertRef{R-DEoptim}{RSDC} \cr
+\insertRef{DEoptim-JSS}{RSDC} \cr
+\insertRef{hamilton1989}{RSDC} \cr
+\insertRef{pelletier2006regime}{RSDC}
 }
 \seealso{
 \code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},

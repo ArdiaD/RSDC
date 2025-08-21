@@ -46,8 +46,9 @@
 #' }
 #'
 #' @references
-#' Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#' and the business cycle. \emph{Econometrica}, \bold{57}(2), 357–384.
+#' \insertRef{engle2002dynamic}{RSDC} \cr
+#' \insertRef{hamilton1989}{RSDC} \cr
+#' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @importFrom DEoptim DEoptim
 #' @importFrom stats optim plogis cor sd

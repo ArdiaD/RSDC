@@ -45,6 +45,7 @@
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' set.seed(123)
 #' T <- 60; K <- 3; N <- 2
 #' y <- scale(matrix(rnorm(T*K), T, K))
@@ -54,7 +55,7 @@
 #' rsdc_forecast("noX", N, y, NULL,
 #'               list(correlations = rho, transition_matrix = Pfix, log_likelihood = -200),
 #'               vols, 1:K)
-#'
+#'}
 #' @seealso \code{\link{rsdc_hamilton}}, \code{\link{rsdc_estimate}},
 #'   \code{\link{rsdc_minvar}}, \code{\link{rsdc_maxdiv}}
 #'

@@ -49,6 +49,7 @@ bounds by \code{long_only}; on error, weights default to \eqn{1/K}.
 }
 }
 \examples{
+\dontrun{
 # Toy example with K = 3
 if (requireNamespace("Rsolnp", quietly = TRUE)) {
   T <- 50; K <- 3
@@ -66,6 +67,7 @@ if (requireNamespace("Rsolnp", quietly = TRUE)) {
                     long_only      = TRUE)
   head(mx$weights)
   mx$mean_diversification
+}
 }
 
 }

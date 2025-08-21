@@ -42,6 +42,7 @@
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' set.seed(123)
 #' n <- 200; K <- 3; N <- 2; p <- 2
 #' # Covariates: intercept + trend
@@ -66,14 +67,11 @@
 #' table(sim$states)
 #' dim(sim$observations)
 #' }
+#' }
 #'
 #' @seealso \code{\link{rsdc_hamilton}} (filter/evaluation),
 #'   \code{\link{rsdc_estimate}} (estimators),
 #'   \code{\link{rsdc_forecast}} (forecasting)
-#'
-#' @references
-#'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#'   and the business cycle. \emph{Econometrica}, 57(2), 357-384.
 #'
 #' @note Requires \pkg{mvtnorm} for multivariate normal sampling (called as \code{mvtnorm::rmvnorm}).
 #'

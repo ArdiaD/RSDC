@@ -10,6 +10,9 @@ f_optim_const(residuals, out_of_sample = FALSE, control = list())
 \item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals or
 returns (columns treated as mean-zero with unit variance).}
 
+\item{out_of_sample}{Logical. If \code{TRUE}, estimation uses the first 70\\% of rows; the
+remainder is held out. (Split index is a fixed 70/30 cut.)}
+
 \item{control}{Optional list for basic verbosity control, currently supporting
 \code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
 are set internally.}
@@ -61,8 +64,10 @@ fit$log_likelihood
 
 }
 \references{
-Storn, R. & Price, K. (1997). Differential Evolution — a simple and efficient
-heuristic for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+\insertRef{R-DEoptim}{RSDC}
+\insertRef{DEoptim-JSS}{RSDC}
+\insertRef{hamilton1989}{RSDC}
+\insertRef{pelletier2006regime}{RSDC}
 }
 \seealso{
 \code{\link{rsdc_estimate}} (wrapper),

@@ -43,6 +43,7 @@
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' set.seed(1)
 #' T <- 50; K <- 3; N <- 2
 #' y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
@@ -65,13 +66,13 @@
 #' out_tvtp <- rsdc_hamilton(y = y, X = X, beta = beta,
 #'                           rho_matrix = rho, K = K, N = N)
 #' out_tvtp$log_likelihood
+#' }
 #'
 #' @seealso \code{\link{rsdc_likelihood}}, \code{\link{f_optim}}, \code{\link{f_optim_noX}},
 #'   \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}
 #'
 #' @references
-#'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#'   and the business cycle. \emph{Econometrica}, 57(2), 357-384.
+#' \insertRef{hamilton1989}{RSDC}
 #'
 #' @note TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
 #'
@@ -242,6 +243,7 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' # Small toy example (N = 2, K = 3), fixed P (no exog)
 #' set.seed(1)
 #' T <- 40; K <- 3; N <- 2
@@ -263,6 +265,7 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #' params_tvtp <- c(as.vector(t(beta)), rho1, rho2)
 #' nll_tvtp <- rsdc_likelihood(params_tvtp, y = y, exog = X, K = K, N = N)
 #' nll_tvtp
+#' }
 #'
 #' @seealso \code{\link{rsdc_hamilton}} (filter), \code{\link{f_optim}} (TVTP estimator),
 #'   \code{\link{f_optim_noX}} (fixed-\emph{P} estimator), \code{\link{f_optim_const}} (constant correlation),

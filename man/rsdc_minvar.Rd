@@ -59,6 +59,7 @@ remove the \code{/ 100} in the implementation or convert inputs accordingly.
 }
 
 \examples{
+\dontrun{
 # Toy example with K = 3
 T <- 50; K <- 3
 set.seed(42)
@@ -75,6 +76,7 @@ mv <- rsdc_minvar(sigma_matrix  = vols,
                   long_only     = TRUE)
 head(mv$weights)
 mv$volatility
+}
 
 }
 \seealso{

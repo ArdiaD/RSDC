@@ -50,8 +50,9 @@
 #'
 #' @seealso \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
 #' @references
-#'   Hamilton, J. D. (1989). \emph{Econometrica}, 57(2), 357–384. (Regime filtering)
-#'   Storn, R. & Price, K. (1997). \emph{J. Global Optimization}, 11(4), 341–359. (DE)
+#' \insertRef{R-DEoptim}{RSDC}
+#' \insertRef{DEoptim-JSS}{RSDC}
+#' \insertRef{hamilton1989}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
@@ -243,10 +244,9 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #'   \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
 #' @references
-#'   Hamilton, J. D. (1989). A new approach to the economic analysis of nonstationary time series
-#'   and the business cycle. \emph{Econometrica}, 57(2), 357–384.
-#'   Storn, R. & Price, K. (1997). Differential Evolution – A simple and efficient heuristic
-#'   for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+#' \insertRef{R-DEoptim}{RSDC}
+#' \insertRef{DEoptim-JSS}{RSDC}
+#' \insertRef{hamilton1989}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
@@ -337,6 +337,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'
 #' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals or
 #'   returns (columns treated as mean-zero with unit variance).
+#' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the
+#'   remainder is held out. (Split index is a fixed 70/30 cut.)
 #' @param control Optional list for basic verbosity control, currently supporting
 #'   \code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
 #'   are set internally.
@@ -380,8 +382,10 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'   \code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
 #'
 #' @references
-#'   Storn, R. & Price, K. (1997). Differential Evolution — a simple and efficient
-#'   heuristic for global optimization. \emph{Journal of Global Optimization}, 11(4), 341–359.
+#' \insertRef{R-DEoptim}{RSDC}
+#' \insertRef{DEoptim-JSS}{RSDC}
+#' \insertRef{hamilton1989}{RSDC}
+#' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
@@ -448,7 +452,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 
   # Single returned likelihood depending on the flag
   ll_return <- if (out_of_sample) {
-    -neg_loglik_const(rho_vec, y_oos, K)  # OOS ll
+    -neg_loglik_const(rho_vec, y_is, K)  # OOS ll
   } else {
     -optim_result$value                   # IS ll
   }
@@ -496,12 +500,20 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'   \item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\% is used for fitting.
 #' }
 #'
+#' @references
+#' \insertRef{R-DEoptim}{RSDC} \cr
+#' \insertRef{DEoptim-JSS}{RSDC} \cr
+#' \insertRef{hamilton1989}{RSDC} \cr
+#' \insertRef{pelletier2006regime}{RSDC}
+#'
 #' @examples
+#' \dontrun{
 #' y <- scale(matrix(rnorm(100 * 3), 100, 3))
 #' rsdc_estimate("const", residuals = y)
 #' rsdc_estimate("noX", residuals = y, N = 2)
 #' X <- cbind(1, scale(seq_len(nrow(y))))
 #' rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+#' }
 #'
 #' @seealso \code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},
 #'   \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
