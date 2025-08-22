@@ -34,12 +34,6 @@ reconstruction and portfolio optimization — in a single, reproducible pipeline
 }
 }
 
-\section{Availability}{
-
-The latest development version is hosted at
-\url{https://github.com/ArdiaD/RSDC}.
-}
-
 \section{Authors}{
 
 David Ardia and Benjamin Seguin

@@ -1,12 +1,13 @@
 Package: RSDC
-Title: Regime-Switching Dynamic Correlation Models in R
+Title: Regime-Switching Dynamic Correlation Models
 Version: 1.1-1
 Authors@R: c(person("David", "Ardia", role = c("aut", "cre"), 
              email = "david.ardia.ch@gmail.com", 
              comment = c(ORCID = "0000-0003-2823-782X")),
              person("Benjamin", "Seguin", role = "aut"))
 Description: Estimation, forecasting, simulation, and portfolio construction for 
-    regime-switching and constant-correlation models.
+    regime-switching models with exogenous variables as in 
+    Pelletier (2006) <doi:10.1016/j.jeconom.2005.01.013>.
 License: GPL-3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

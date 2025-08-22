@@ -30,10 +30,6 @@
 #'     \code{\link{rsdc_simulate}} (simulate TVTP regime-switching series).
 #' }
 #'
-#' @section Availability:
-#' The latest development version is hosted at
-#' \url{https://github.com/ArdiaD/RSDC}.
-#'
 #' @section Authors:
 #' David Ardia and Benjamin Seguin
 #'
