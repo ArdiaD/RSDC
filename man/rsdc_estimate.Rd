@@ -61,9 +61,10 @@ rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
 
 }
 \references{
-\insertRef{R-DEoptim}{RSDC} \cr
 \insertRef{DEoptim-JSS}{RSDC} \cr
+
 \insertRef{hamilton1989}{RSDC} \cr
+
 \insertRef{pelletier2006regime}{RSDC}
 }
 \seealso{

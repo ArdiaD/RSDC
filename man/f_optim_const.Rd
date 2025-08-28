@@ -52,9 +52,10 @@ correlation structure is estimated.
 Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 }
 \references{
-\insertRef{R-DEoptim}{RSDC}
 \insertRef{DEoptim-JSS}{RSDC}
+
 \insertRef{hamilton1989}{RSDC}
+
 \insertRef{pelletier2006regime}{RSDC}
 }
 \seealso{

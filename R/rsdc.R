@@ -35,7 +35,9 @@
 #'
 #' @references
 #' \insertRef{engle2002dynamic}{RSDC} \cr
+#'
 #' \insertRef{hamilton1989}{RSDC} \cr
+#'
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @importFrom DEoptim DEoptim

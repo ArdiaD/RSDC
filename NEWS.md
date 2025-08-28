@@ -1,13 +1,11 @@
-# Changes in Version 1.1-3 (BS)
-- Data added under the right .rda format
-- Data Documentation added
-
-# Changes in Version 1.1-2 (DA)
+# Changes in Version 1.1-2 (BS,DA)
 - DESCRIPTION improved following CRAN's guidelines
 - Seed is now a control parameter
 - Removed examples for unexported functions
 - Fixed donot run examples
 - Added green-brown-ptf data in extdata
+- Data added under the right .rda format
+- Data Documentation added
 
 # Changes in Version 1.1-1 (DA)
 - URls fixed

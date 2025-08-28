@@ -59,8 +59,8 @@ Inputs in \code{residuals} are treated as mean-zero with unit variance; only the
 }
 
 \references{
-\insertRef{R-DEoptim}{RSDC}
 \insertRef{DEoptim-JSS}{RSDC}
+
 \insertRef{hamilton1989}{RSDC}
 }
 \seealso{

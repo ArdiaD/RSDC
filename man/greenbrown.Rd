@@ -5,22 +5,22 @@
 \alias{greenbrown}
 \title{Green vs Brown portfolio dataset}
 \format{
-A data frame with 2266 rows and columns:
+A data frame with 2266 rows and three columns:
 \describe{
-\item{DATE}{Dates going from 2014-01-02 to 2024-12-30.}
+\item{DATE}{Dates ranging from 2014-01-02 to 2024-12-30.}
 \item{return_green}{Numeric returns for the green portfolio.}
 \item{return_brown}{Numeric returns for the brown portfolio.}
 }
 }
 \source{
-Included originally as \code{inst/extdata/green-brown-ptf.xlsx}.
+Originally data in \code{inst/extdata/green-brown-ptf.xlsx}.
 }
 \usage{
 data(greenbrown)
 }
 \description{
-Daily returns for a green and a brown portfolio constructed following the equal 1090
-methodology.
+Daily returns for a green and a brown portfolios constructed following
+the equal-weighted 10-90 percentile approach.
 }
 \examples{
 data("greenbrown")

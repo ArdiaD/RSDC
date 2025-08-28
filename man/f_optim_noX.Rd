@@ -59,8 +59,8 @@ structure and fixed transition probabilities are estimated.
 }
 
 \references{
-\insertRef{R-DEoptim}{RSDC}
 \insertRef{DEoptim-JSS}{RSDC}
+
 \insertRef{hamilton1989}{RSDC}
 }
 \seealso{

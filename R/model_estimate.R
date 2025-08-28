@@ -42,8 +42,8 @@
 #'
 #' @seealso \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
 #' @references
-#' \insertRef{R-DEoptim}{RSDC}
 #' \insertRef{DEoptim-JSS}{RSDC}
+#'
 #' \insertRef{hamilton1989}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
@@ -228,8 +228,8 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #'   \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
 #' @references
-#' \insertRef{R-DEoptim}{RSDC}
 #' \insertRef{DEoptim-JSS}{RSDC}
+#'
 #' \insertRef{hamilton1989}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
@@ -355,9 +355,10 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'   \code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
 #'
 #' @references
-#' \insertRef{R-DEoptim}{RSDC}
 #' \insertRef{DEoptim-JSS}{RSDC}
+#'
 #' \insertRef{hamilton1989}{RSDC}
+#'
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
@@ -474,9 +475,10 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' }
 #'
 #' @references
-#' \insertRef{R-DEoptim}{RSDC} \cr
 #' \insertRef{DEoptim-JSS}{RSDC} \cr
+#'
 #' \insertRef{hamilton1989}{RSDC} \cr
+#'
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @examples
