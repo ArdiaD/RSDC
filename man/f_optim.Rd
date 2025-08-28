@@ -18,8 +18,9 @@ Include an intercept column yourself if desired (no automatic intercept).}
 \item{out_of_sample}{Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the remainder is
 held out (indices are fixed by a 70/30 split).}
 
-\item{control}{Optional list. Currently supports \code{do_trace = TRUE} to print optimizer progress.
-(Algorithmic hyperparameters are set internally.)}
+\item{control}{Optional list for basic verbosity control, currently supporting
+\code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+reproducibility (default = 123). Algorithmic hyperparameters are set internally.}
 }
 \value{
 A list with:
@@ -57,16 +58,6 @@ Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation structure is estimated.
 }
 
-\examples{
-\dontrun{
-T <- 60; K <- 3; N <- 2
-y <- matrix(rnorm(T * K), T, K)
-X <- cbind(1, scale(seq_len(T)))
-fit <- f_optim(N = N, residuals = y, X = X)
-str(fit$correlations)
-}
-
-}
 \references{
 \insertRef{R-DEoptim}{RSDC}
 \insertRef{DEoptim-JSS}{RSDC}

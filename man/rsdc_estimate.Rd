@@ -24,7 +24,7 @@ rsdc_estimate(
 
 \item{out_of_sample}{Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.}
 
-\item{control}{Optional list. Currently forwards \code{do_trace = TRUE} to the backends.}
+\item{control}{Optional list. Currently forwards \code{do_trace = FALSE} and \code{seed = 123} to the backends.}
 }
 \value{
 \describe{
@@ -51,7 +51,7 @@ Unified front-end that dispatches to one of three estimators:
 }
 }
 \examples{
-\dontrun{
+\donttest{
 y <- scale(matrix(rnorm(100 * 3), 100, 3))
 rsdc_estimate("const", residuals = y)
 rsdc_estimate("noX", residuals = y, N = 2)

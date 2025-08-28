@@ -71,7 +71,6 @@ and \code{K * (K - 1) / 2} for \code{"const"}.
 }
 }
 \examples{
-\dontrun{
 set.seed(123)
 T <- 60; K <- 3; N <- 2
 y <- scale(matrix(rnorm(T*K), T, K))
@@ -81,7 +80,6 @@ Pfix <- matrix(c(0.9, 0.1, 0.2, 0.8), 2, 2, byrow = TRUE)
 rsdc_forecast("noX", N, y, NULL,
               list(correlations = rho, transition_matrix = Pfix, log_likelihood = -200),
               vols, 1:K)
-}
 }
 \seealso{
 \code{\link{rsdc_hamilton}}, \code{\link{rsdc_estimate}},

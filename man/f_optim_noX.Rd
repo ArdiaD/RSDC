@@ -15,8 +15,9 @@ f_optim_noX(N, residuals, out_of_sample = FALSE, control = list())
 \item{out_of_sample}{Logical. If \code{TRUE}, estimation uses the first 70\\% of rows; the
 remainder is held out. (Split index is a fixed 70/30 cut.)}
 
-\item{control}{Optional list. Currently supports \code{do_trace = TRUE} to print optimizer
-progress. Algorithmic hyperparameters are set internally.}
+\item{control}{Optional list for basic verbosity control, currently supporting
+\code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+reproducibility (default = 123). Algorithmic hyperparameters are set internally.}
 }
 \value{
 A list with:
@@ -57,16 +58,6 @@ Inputs in \code{residuals} are treated as mean-zero with unit variance; only the
 structure and fixed transition probabilities are estimated.
 }
 
-\examples{
-\dontrun{
-T <- 50; K <- 3; N <- 2
-y <- matrix(rnorm(T * K), T, K)
-fit <- f_optim_noX(N = N, residuals = y)
-fit$transition_matrix
-fit$correlations
-}
-
-}
 \references{
 \insertRef{R-DEoptim}{RSDC}
 \insertRef{DEoptim-JSS}{RSDC}

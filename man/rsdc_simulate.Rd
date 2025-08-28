@@ -60,32 +60,24 @@ distribution with probabilities \eqn{P_t(S_{t-1}, \cdot)} and
 Requires \pkg{mvtnorm} for multivariate normal sampling (called as \code{mvtnorm::rmvnorm}).
 }
 \examples{
-\dontrun{
 set.seed(123)
 n <- 200; K <- 3; N <- 2; p <- 2
-# Covariates: intercept + trend
 X <- cbind(1, scale(seq_len(n)))
 
-# TVTP coefficients: encourage persistence on the diagonal
 beta <- array(0, dim = c(N, N, p))
 beta[1, 1, ] <- c(1.2,  0.0)
 beta[2, 2, ] <- c(1.0, -0.1)
 
-# Regime means and covariances
 mu <- rbind(c(0, 0, 0),
             c(0, 0, 0))
 rho <- rbind(c(0.10, 0.05, 0.00),
-             c(0.60, 0.40, 0.30))  # lower-tri for K=3: (2,1), (3,1), (3,2)
+             c(0.60, 0.40, 0.30))
 Sig <- array(0, dim = c(K, K, N))
 for (m in 1:N) {
   R <- diag(K); R[lower.tri(R)] <- rho[m, ]; R[upper.tri(R)] <- t(R)[upper.tri(R)]
   Sig[, , m] <- R
-
+}
 sim <- rsdc_simulate(n = n, X = X, beta = beta, mu = mu, sigma = Sig, N = N, seed = 99)
-table(sim$states)
-dim(sim$observations)
-}
-}
 
 }
 \seealso{

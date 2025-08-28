@@ -44,7 +44,6 @@
 #' remove the \code{/ 100} in the implementation or convert inputs accordingly.
 #'
 #' @examples
-#' \dontrun{
 #' # Toy example with K = 3
 #' T <- 50; K <- 3
 #' set.seed(42)
@@ -61,7 +60,6 @@
 #'                   long_only     = TRUE)
 #' head(mv$weights)
 #' mv$volatility
-#' }
 #'
 #' @seealso \code{\link{rsdc_maxdiv}} (maximum diversification),
 #'   \code{\link[quadprog]{solve.QP}}
@@ -179,7 +177,6 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #' @importFrom stats sd
 #'
 #' @examples
-#' \dontrun{
 #' # Toy example with K = 3
 #' if (requireNamespace("Rsolnp", quietly = TRUE)) {
 #'   T <- 50; K <- 3
@@ -197,7 +194,6 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #'                     long_only      = TRUE)
 #'   head(mx$weights)
 #'   mx$mean_diversification
-#' }
 #' }
 #'
 #' @export
