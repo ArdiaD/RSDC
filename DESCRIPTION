@@ -1,6 +1,6 @@
 Package: RSDC
 Title: Regime-Switching Dynamic Correlation Models
-Version: 1.1-1
+Version: 1.1-3
 Authors@R: c(person("David", "Ardia", role = c("aut", "cre"), 
              email = "david.ardia.ch@gmail.com", 
              comment = c(ORCID = "0000-0003-2823-782X")),
@@ -29,3 +29,6 @@ Suggests:
 Config/testthat/edition: 3
 RdMacros:
     Rdpack
+Depends: 
+    R (>= 3.5)
+LazyData: true

@@ -61,7 +61,6 @@ degenerates at a time step, \code{log_likelihood = -Inf} is returned.
 TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
 }
 \examples{
-\dontrun{
 set.seed(1)
 T <- 50; K <- 3; N <- 2
 y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
@@ -84,7 +83,6 @@ beta <- rbind(c(1.2, 0.0),
 out_tvtp <- rsdc_hamilton(y = y, X = X, beta = beta,
                           rho_matrix = rho, K = K, N = N)
 out_tvtp$log_likelihood
-}
 
 }
 \references{

@@ -14,8 +14,8 @@ returns (columns treated as mean-zero with unit variance).}
 remainder is held out. (Split index is a fixed 70/30 cut.)}
 
 \item{control}{Optional list for basic verbosity control, currently supporting
-\code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
-are set internally.}
+\code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+reproducibility (default = 123). Algorithmic hyperparameters are set internally.}
 }
 \value{
 A list with:
@@ -50,18 +50,6 @@ correlation structure is estimated.
 }
 \note{
 Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
-}
-\examples{
-\dontrun{
-set.seed(123)
-T <- 120; K <- 3
-y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
-fit <- f_optim_const(residuals = y)
-round(drop(fit$covariances[,,1]), 3)
-fit$correlations
-fit$log_likelihood
-}
-
 }
 \references{
 \insertRef{R-DEoptim}{RSDC}

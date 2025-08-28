@@ -13,8 +13,9 @@
 #'   Include an intercept column yourself if desired (no automatic intercept).
 #' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70% of rows; the remainder is
 #'   held out (indices are fixed by a 70/30 split).
-#' @param control Optional list. Currently supports \code{do_trace = TRUE} to print optimizer progress.
-#'   (Algorithmic hyperparameters are set internally.)
+#' @param control Optional list for basic verbosity control, currently supporting
+#'   \code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+#'   reproducibility (default = 123). Algorithmic hyperparameters are set internally.
 #'
 #' @returns A list with:
 #' \describe{
@@ -39,15 +40,6 @@
 #' @section Assumptions:
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation structure is estimated.
 #'
-#' @examples
-#' \dontrun{
-#' T <- 60; K <- 3; N <- 2
-#' y <- matrix(rnorm(T * K), T, K)
-#' X <- cbind(1, scale(seq_len(T)))
-#' fit <- f_optim(N = N, residuals = y, X = X)
-#' str(fit$correlations)
-#' }
-#'
 #' @seealso \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
 #' @references
 #' \insertRef{R-DEoptim}{RSDC}
@@ -59,7 +51,7 @@
 #' @importFrom stats optim plogis
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 
-  con <- list(do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
 
   # Parameter setup
@@ -90,7 +82,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   }
 
   # DEoptim
-  set.seed(123)
+  set.seed(con$seed)
   results <- DEoptim::DEoptim(
     fn = rsdc_likelihood,
     lower = bounds$lower,
@@ -201,8 +193,9 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #'   (columns are treated as mean-zero with unit variance).
 #' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the
 #'   remainder is held out. (Split index is a fixed 70/30 cut.)
-#' @param control Optional list. Currently supports \code{do_trace = TRUE} to print optimizer
-#'   progress. Algorithmic hyperparameters are set internally.
+#' @param control Optional list for basic verbosity control, currently supporting
+#'   \code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+#'   reproducibility (default = 123). Algorithmic hyperparameters are set internally.
 #'
 #' @returns A list with:
 #' \describe{
@@ -231,15 +224,6 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
 #' structure and fixed transition probabilities are estimated.
 #'
-#' @examples
-#' \dontrun{
-#' T <- 50; K <- 3; N <- 2
-#' y <- matrix(rnorm(T * K), T, K)
-#' fit <- f_optim_noX(N = N, residuals = y)
-#' fit$transition_matrix
-#' fit$correlations
-#' }
-#'
 #' @seealso \code{\link{f_optim}} (TVTP), \code{\link{f_optim_const}} (constant correlation),
 #'   \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
@@ -254,7 +238,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
-  con <- list(do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -275,7 +259,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     y_optim <- residuals
   }
 
-  set.seed(123)
+  set.seed(con$seed)
   de_result <- DEoptim::DEoptim(
     fn = rsdc_likelihood,
     lower = bounds$lower,
@@ -340,8 +324,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #' @param out_of_sample Logical. If \code{TRUE}, estimation uses the first 70\% of rows; the
 #'   remainder is held out. (Split index is a fixed 70/30 cut.)
 #' @param control Optional list for basic verbosity control, currently supporting
-#'   \code{do_trace = TRUE} to print optimizer progress. Algorithmic hyperparameters
-#'   are set internally.
+#'   \code{do_trace = TRUE} to print optimizer progress and \code{seed} for
+#'   reproducibility (default = 123). Algorithmic hyperparameters are set internally.
 #'
 #' @returns A list with:
 #' \describe{
@@ -367,17 +351,6 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'         correlation structure is estimated.
 #' }
 #'
-#' @examples
-#' \dontrun{
-#' set.seed(123)
-#' T <- 120; K <- 3
-#' y <- scale(matrix(rnorm(T * K), T, K), center = TRUE, scale = TRUE)
-#' fit <- f_optim_const(residuals = y)
-#' round(drop(fit$covariances[,,1]), 3)
-#' fit$correlations
-#' fit$log_likelihood
-#' }
-#'
 #' @seealso \code{\link{rsdc_estimate}} (wrapper),
 #'   \code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
 #'
@@ -393,7 +366,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
-  con <- list(do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -425,7 +398,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   }
 
   # Fit on IS only
-  set.seed(123)
+  set.seed(con$seed)
   de_result <- DEoptim::DEoptim(
     fn = neg_loglik_const,
     lower = rep(-1, n_rho),
@@ -482,7 +455,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
 #' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
-#' @param control Optional list. Currently forwards \code{do_trace = TRUE} to the backends.
+#' @param control Optional list. Currently forwards \code{do_trace = FALSE} and \code{seed = 123} to the backends.
 #'
 #' @return
 #' \describe{
@@ -507,7 +480,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' y <- scale(matrix(rnorm(100 * 3), 100, 3))
 #' rsdc_estimate("const", residuals = y)
 #' rsdc_estimate("noX", residuals = y, N = 2)
@@ -524,21 +497,21 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
 
-  con <- list(do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
 
   if (method == "tvtp") {
     if (is.null(X)) stop("X must be provided for method = 'tvtp'")
-    return(f_optim(N = N, residuals = residuals, X = X, out_of_sample = out_of_sample, control = list(do_trace = con$do_trace)))
+    return(f_optim(N = N, residuals = residuals, X = X, out_of_sample = out_of_sample, control = list(seed = con$seed, do_trace = con$do_trace)))
   }
 
   if (method == "noX") {
-    return(f_optim_noX(N = N, residuals = residuals, out_of_sample = out_of_sample, control = list(do_trace = con$do_trace)))
+    return(f_optim_noX(N = N, residuals = residuals, out_of_sample = out_of_sample, control = list(seed = con$seed, do_trace = con$do_trace)))
   }
 
   if (method == "const") {
     return(f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
-                         control = list(do_trace = con$do_trace)))
+                         control = list(seed = con$seed, do_trace = con$do_trace)))
   }
 
   stop("Unknown method: ", method)
