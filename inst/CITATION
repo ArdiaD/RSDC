@@ -7,5 +7,5 @@ bibentry(bibtype = "Manual",
   year   = "2025",
   organization = "CRAN",
   textVersion = paste("Ardia, D., Seguin, B. (2025).",
-    "RSDC: Regime-Switching Dynamic Correlation Models in R)
+    "RSDC: Regime-Switching Dynamic Correlation Models in R.")
 )

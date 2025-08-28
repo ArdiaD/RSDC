@@ -66,8 +66,7 @@
 #'                           rho_matrix = rho, K = K, N = N)
 #' out_tvtp$log_likelihood
 #'
-#' @seealso \code{\link{rsdc_likelihood}}, \code{\link{f_optim}}, \code{\link{f_optim_noX}},
-#'   \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}
+#' @seealso \code{\link{rsdc_likelihood}} and \code{\link{rsdc_estimate}}.
 #'
 #' @references
 #' \insertRef{hamilton1989}{RSDC}
@@ -263,9 +262,8 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #' nll_tvtp <- rsdc_likelihood(params_tvtp, y = y, exog = X, K = K, N = N)
 #' nll_tvtp
 #'
-#' @seealso \code{\link{rsdc_hamilton}} (filter), \code{\link{f_optim}} (TVTP estimator),
-#'   \code{\link{f_optim_noX}} (fixed-\emph{P} estimator), \code{\link{f_optim_const}} (constant correlation),
-#'   \code{\link[stats]{optim}}, \code{\link[DEoptim]{DEoptim}}
+#' @seealso \code{\link{rsdc_hamilton}} (filter),
+#' \code{\link[stats]{optim}}, and \code{\link[DEoptim]{DEoptim}}
 #'
 #' @note The function is written for use inside optimizers; it performs inexpensive validation
 #'       and returns large penalties for invalid parameterizations instead of stopping with errors.

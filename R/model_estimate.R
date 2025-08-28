@@ -40,7 +40,7 @@
 #' @section Assumptions:
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation structure is estimated.
 #'
-#' @seealso \code{\link{f_optim_noX}}, \code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
+#' @seealso \code{\link{rsdc_estimate}}, \code{\link{rsdc_hamilton}}
 #' @references
 #' \insertRef{DEoptim-JSS}{RSDC}
 #'
@@ -49,6 +49,7 @@
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
 #' @importFrom stats optim plogis
+#' @noRd
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 
   con <- list(seed = 123, do_trace = FALSE)
@@ -224,8 +225,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
 #' structure and fixed transition probabilities are estimated.
 #'
-#' @seealso \code{\link{f_optim}} (TVTP), \code{\link{f_optim_const}} (constant correlation),
-#'   \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
+#' @seealso \code{\link{rsdc_estimate}} (wrapper), \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
 #'
 #' @references
 #' \insertRef{DEoptim-JSS}{RSDC}
@@ -235,6 +235,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
 #' @importFrom stats optim
+#' @noRd
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -351,8 +352,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'         correlation structure is estimated.
 #' }
 #'
-#' @seealso \code{\link{rsdc_estimate}} (wrapper),
-#'   \code{\link{f_optim}} (TVTP), \code{\link{f_optim_noX}} (fixed transition matrix)
+#' @seealso \code{\link{rsdc_estimate}} (wrapper).
 #'
 #' @references
 #' \insertRef{DEoptim-JSS}{RSDC}
@@ -364,6 +364,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #' @note Uses \code{DEoptim::DEoptim()} then \code{stats::optim(method = "L-BFGS-B")}.
 #'
 #' @importFrom stats optim
+#' @noRd
 f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
@@ -490,8 +491,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
 #' }
 #'
-#' @seealso \code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},
-#'   \code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
+#' @seealso \code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
 #'
 #' @export
 rsdc_estimate <- function(method = c("tvtp", "noX", "const"),

@@ -89,6 +89,5 @@ out_tvtp$log_likelihood
 \insertRef{hamilton1989}{RSDC}
 }
 \seealso{
-\code{\link{rsdc_likelihood}}, \code{\link{f_optim}}, \code{\link{f_optim_noX}},
-\code{\link{f_optim_const}}, \code{\link{rsdc_estimate}}
+\code{\link{rsdc_likelihood}} and \code{\link{rsdc_estimate}}.
 }

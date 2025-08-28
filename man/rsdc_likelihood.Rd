@@ -85,7 +85,6 @@ nll_tvtp
 
 }
 \seealso{
-\code{\link{rsdc_hamilton}} (filter), \code{\link{f_optim}} (TVTP estimator),
-\code{\link{f_optim_noX}} (fixed-\emph{P} estimator), \code{\link{f_optim_const}} (constant correlation),
-\code{\link[stats]{optim}}, \code{\link[DEoptim]{DEoptim}}
+\code{\link{rsdc_hamilton}} (filter),
+\code{\link[stats]{optim}}, and \code{\link[DEoptim]{DEoptim}}
 }

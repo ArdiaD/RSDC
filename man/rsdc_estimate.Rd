@@ -68,6 +68,5 @@ rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
 \insertRef{pelletier2006regime}{RSDC}
 }
 \seealso{
-\code{\link{f_optim}}, \code{\link{f_optim_noX}}, \code{\link{f_optim_const}},
-\code{\link{rsdc_hamilton}}, \code{\link{rsdc_likelihood}}
+\code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
 }
