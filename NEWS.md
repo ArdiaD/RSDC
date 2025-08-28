@@ -1,3 +1,7 @@
+# Changes in Version 1.1-3 (BS)
+- Data added under the right .rda format
+- Data Documentation added
+
 # Changes in Version 1.1-2 (DA)
 - DESCRIPTION improved following CRAN's guidelines
 - Seed is now a control parameter
