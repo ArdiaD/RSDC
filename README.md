@@ -29,17 +29,17 @@ By using **RSDC**, you agree to the following:
 
 ## References
 
-- **Engle, R.F. (2002).**
-  *Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models.*
-  *Journal of Business & Economic Statistics*, 20(3), 339–350.
-  [https://doi.org/10.1198/073500102288618487]
+Engle, R.F. (2002).
+[Dynamic conditional correlation: A simple class of multivariate 
+generalized autoregressive conditional 
+heteroskedasticity models](https://doi.org/10.1198/073500102288618487).
+*Journal of Business & Economic Statistics*, 20(3), 339–350.
 
-- **Pelletier, D. (2006).**
-  *Regime switching for dynamic correlations.*
-  *Journal of Econometrics*, 131(1–2), 445–473.
-  [https://doi.org/10.1016/j.jeconom.2005.01.013]
+Pelletier, D. (2006).
+[Regime switching for dynamic correlations](https://doi.org/10.1016/j.jeconom.2005.01.013).
+*Journal of Econometrics*, 131(1–2), 445–473.
 
-- **Hamilton, J.D. (1989).**  
-  *A new approach to the economic analysis of nonstationary time series and the business cycle.*  
-  *Econometrica*, 57(2), 357–384.  
-  [https://doi.org/10.2307/1912559](https://doi.org/10.2307/1912559)
+Hamilton, J.D. (1989).
+[A new approach to the economic analysis of nonstationary time 
+series and the business cycle](https://doi.org/10.2307/1912559). 
+*Econometrica*, 57(2), 357–384.  
