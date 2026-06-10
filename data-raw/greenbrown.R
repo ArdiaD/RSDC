@@ -1,7 +1,8 @@
 # Build the packaged dataset "greenbrown" from the Excel in inst/extdata
 
 # Only needed for building the data:
-if (!requireNamespace("readxl", quietly = TRUE)) install.packages("readxl")
+if (!requireNamespace("readxl", quietly = TRUE))
+  stop("Package 'readxl' is required to rebuild this dataset. Install it with: install.packages(\"readxl\")")
 
 file <- system.file("extdata", "green-brown-ptf.xlsx", package = "RSDC")
 

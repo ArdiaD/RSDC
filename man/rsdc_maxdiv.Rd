@@ -4,7 +4,14 @@
 \alias{rsdc_maxdiv}
 \title{Maximum-Diversification Portfolio (Rolling Weights)}
 \usage{
-rsdc_maxdiv(sigma_matrix, value_cols, predicted_corr, y, long_only = TRUE)
+rsdc_maxdiv(
+  sigma_matrix,
+  value_cols,
+  predicted_corr,
+  y,
+  long_only = TRUE,
+  lag = FALSE
+)
 }
 \arguments{
 \item{sigma_matrix}{Numeric matrix \eqn{T \times K} of forecasted standard deviations.}
@@ -18,6 +25,12 @@ in \code{combn(K, 2)} column order.}
 
 \item{long_only}{Logical. If \code{TRUE}, impose \eqn{w \ge 0} and \eqn{\sum_i w_i = 1};
 otherwise bounds are \eqn{-1 \le w_i \le 1} with \eqn{\sum_i w_i = 1}.}
+
+\item{lag}{Logical. If \code{FALSE} (default), the period-\eqn{t} weights (built from
+\eqn{\Sigma_t}) are applied to the same period's returns \code{y[t, ]} (in-sample
+evaluation). If \code{TRUE}, weights chosen at \eqn{t-1} earn the period-\eqn{t} return
+(\code{sum(y[t, ] * weights[t-1, ])}) and the first period's return is \code{NA}; use
+\code{lag = TRUE} for a look-ahead-free out-of-sample backtest.}
 }
 \value{
 \describe{

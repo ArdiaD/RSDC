@@ -24,7 +24,7 @@ if (length(missing)) {
 }
 
 suppressPackageStartupMessages({
-  lapply(required, requireNamespace, quietly = TRUE, character.only = TRUE)
+  lapply(required, requireNamespace, quietly = TRUE)
 })
 
 # 2) Basic metadata sanity checks

@@ -3,10 +3,10 @@ test_that("rsdc_simulate generates consistent shapes", {
 
   n <- 25; K <- 3; N <- 2; p <- 2
   X <- cbind(1, rnorm(n))
-  beta <- array(0, dim = c(N, N, p))
+  beta <- matrix(0, nrow = N, ncol = (N - 1) * p)
   # Encourage self-persistence
-  beta[1,1,] <- c(1.5, 0.0)
-  beta[2,2,] <- c(1.2, 0.0)
+  beta[1, ] <- c(1.5, 0.0)
+  beta[2, ] <- c(1.2, 0.0)
 
   mu <- rbind(rep(0, K), rep(0, K))
   # two regimes: different correlation levels
@@ -23,4 +23,5 @@ test_that("rsdc_simulate generates consistent shapes", {
   expect_equal(length(sim$states), n)
   expect_equal(dim(sim$observations), c(n, K))
   expect_equal(dim(sim$transition_matrices), c(N, N, n))
+  expect_true(all(is.na(sim$transition_matrices[,,1])))
 })

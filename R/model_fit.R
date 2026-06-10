@@ -2,20 +2,31 @@
 #'
 #' Runs the Hamilton (1989) filter for a multivariate regime-switching \emph{correlation} model.
 #' Supports either a fixed (time-invariant) transition matrix \eqn{P} or time-varying transition
-#' probabilities (TVTP) built from exogenous covariates \code{X} via a logistic link.
+#' probabilities (TVTP) built from exogenous covariates \code{X}: a logistic link for \eqn{N=2}
+#' or a softmax link for \eqn{N \ge 3}.
 #' Returns filtered/smoothed regime probabilities and the log-likelihood.
 #'
 #' @param y Numeric matrix \eqn{T \times K} of observations (e.g., standardized residuals/returns).
 #'   Columns are treated as mean-zero with unit variance; only the correlation structure is modeled.
 #' @param X Optional numeric matrix \eqn{T \times p} of covariates for TVTP. Required if \code{beta} is supplied.
-#' @param beta Optional numeric matrix \eqn{N \times p}. TVTP coefficients; row \eqn{i} governs
-#'   persistence of regime \eqn{i} via \code{plogis(X[t, ] \%*\% beta[i, ])}.
+#' @param beta Optional numeric matrix of TVTP coefficients.
+#'   For \eqn{N=2}: an \eqn{N \times p} matrix; row \eqn{i} gives the logistic coefficient
+#'   vector so that \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}.
+#'   For \eqn{N \ge 3}: an \eqn{N \times (N-1)p} matrix packed row-wise; row \eqn{i}
+#'   contains \eqn{N-1} consecutive length-\eqn{p} softmax vectors; the \eqn{N}-th
+#'   logit is fixed at 0 (reference category).
 #' @param rho_matrix Numeric matrix \eqn{N \times C} of regime correlation parameters, where
 #'   \eqn{C = K(K-1)/2}. Each row is the lower-triangular part (by \code{lower.tri}) of a regime's
 #'   correlation matrix.
 #' @param K Integer. Number of observed series (columns of \code{y}).
 #' @param N Integer. Number of regimes.
 #' @param P Optional \eqn{N \times N} fixed transition matrix. Used only when \code{X} or \code{beta} is \code{NULL}.
+#' @param xi_init Optional numeric vector of length \code{N}. If supplied, the
+#'   forward filter is initialised from this vector (normalised internally to sum
+#'   to 1) instead of the default uniform \eqn{1/N}. Intended for two-pass
+#'   out-of-sample forecasting: run the filter on the in-sample period first,
+#'   extract the terminal column of \code{filtered_probs}, and pass it here to
+#'   initialise the out-of-sample filter run. Must be non-negative and finite.
 #'
 #' @returns A list with:
 #' \describe{
@@ -34,9 +45,11 @@
 #'         \itemize{
 #'           \item \emph{Fixed P:} If \code{X} or \code{beta} is missing, a constant \eqn{P} is used
 #'                 (user-provided via \code{P}; otherwise uniform \eqn{1/N} rows).
-#'           \item \emph{TVTP:} With \code{X} and \code{beta}, diagonal entries use
-#'                 \code{plogis(X[t, ] \%*\% beta[i, ])}. Off-diagonals are equal and sum to \eqn{1 - p_{ii,t}}.
-#'                 For \eqn{N=1}, \eqn{P_t = [1]}.
+#'           \item \emph{TVTP:} With \code{X} and \code{beta}:
+#'                 for \eqn{N=2}, \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
+#'                 \eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});
+#'                 for \eqn{N \ge 3}, a softmax over \eqn{N-1} free logit vectors per row with
+#'                 the \eqn{N}-th logit fixed at 0 (reference category); log-sum-exp stabilised.
 #'         }
 #'   \item \strong{Numerical safeguards:} A small ridge is added before inversion; if filtering
 #'         degenerates at a time step, \code{log_likelihood = -Inf} is returned.
@@ -71,24 +84,39 @@
 #' @references
 #' \insertRef{hamilton1989}{RSDC}
 #'
-#' @note TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
+#' @note For \eqn{N=2}, TVTP uses a logistic link on the diagonal; off-diagonals follow by
+#'   complement. For \eqn{N \ge 3}, a full softmax is used with \eqn{(N-1)} free logit
+#'   vectors per row; all entries are independently determined.
+#'
+#'   X-timing: uses \code{X[t, ]} (contemporaneous) to form \eqn{P_t}, consistent with
+#'   \code{\link{rsdc_simulate}}.
 #'
 #' @importFrom stats plogis
 #' @export
-rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) {
+rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
+                          xi_init = NULL) {
 
   if (!is.matrix(y)) stop("y must be a numeric matrix.")
   if (!is.null(X) && !is.matrix(X)) stop("X must be a numeric matrix or NULL.")
   if (!is.null(beta) && (!is.matrix(beta) || nrow(beta) != N)) stop("beta must be a matrix with N rows.")
+  if (!is.null(beta) && !is.null(X)) {
+    expected_ncol <- if (N == 2L) ncol(X) else (N - 1L) * ncol(X)
+    if (ncol(beta) != expected_ncol)
+      stop(sprintf("beta must have %d column(s) for N=%d and p=%d (got %d).",
+                   expected_ncol, N, ncol(X), ncol(beta)))
+  }
   if (!is.matrix(rho_matrix) || nrow(rho_matrix) != N || ncol(rho_matrix) != K*(K - 1)/2) {
     stop("rho_matrix must be of dimension N x (K*(K-1)/2).")
   }
   if (!is.null(P) && (!is.matrix(P) || !all(dim(P) == c(N, N)))) {
     stop("P must be an N x N matrix if provided.")
   }
+  if (!is.null(xi_init) && (length(xi_init) != N || any(!is.finite(xi_init)) || any(xi_init < 0))) {
+    stop("xi_init must be a non-negative finite vector of length N.")
+  }
 
-  T <- nrow(y)
-  n_pairs <- K*(K - 1)/2
+  n_obs <- nrow(y)
+  if (K != ncol(y)) stop(sprintf("K = %d but ncol(y) = %d.", K, ncol(y)))
 
   # Build regime correlation matrices
   sigma <- array(dim = c(K, K, N))
@@ -98,93 +126,113 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
     R[upper.tri(R)] <- t(R)[upper.tri(R)]
 
     # Check positive definiteness
-    if (min(eigen(R)$values) < 1e-8) return(list(log_likelihood = -Inf))
+    if (min(eigen(R)$values) < 1e-8)
+      return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
 
     sigma[,,m] <- R
   }
 
   # Transition probability matrices
-  P_mats <- array(dim = c(N, N, T))
+  P_mats <- array(dim = c(N, N, n_obs))
 
   if (is.null(X) || is.null(beta)) {
     # No exogenous variables, use fixed transition matrix P
     if (is.null(P)) {
       # If no P matrix is provided, use equal probabilities
-      for (t in 1:T) {
+      for (t in 1:n_obs) {
         P_mats[,,t] <- matrix(1/N, N, N)
       }
     } else {
       # Use provided P matrix
-      for (t in 1:T) {
+      for (t in 1:n_obs) {
         P_mats[,,t] <- P
       }
     }
   } else {
     # Time-varying transition probabilities
-    for (t in 1:T) {
+    p_cov <- ncol(X)
+    for (t in 1:n_obs) {
       for (i in 1:N) {
-        # Diagonal element using logistic function
-        p_ii <- plogis(X[t,] %*% beta[i,])
-
-        # Handle N=1 case
         if (N == 1) {
           P_mats[,,t] <- matrix(1)
           next
+        } else if (N == 2) {
+          # Logistic link: one free parameter vector per regime
+          p_ii <- plogis(X[t,] %*% beta[i,])
+          off_prob <- (1 - p_ii) / (N - 1)
+          P_mats[i,,t] <- off_prob
+          P_mats[i,i,t] <- p_ii
+        } else {
+          # Softmax: (N-1) free beta vectors per regime row; last column is reference (0)
+          logits <- numeric(N)
+          for (j in seq_len(N - 1)) {
+            logits[j] <- sum(X[t, ] * beta[i, ((j - 1L) * p_cov + 1L):(j * p_cov)])
+          }
+          logits[N] <- 0
+          exp_l <- exp(logits - max(logits))
+          P_mats[i,,t] <- exp_l / sum(exp_l)
         }
-
-        # Off-diagonal elements (equal probability)
-        off_prob <- (1 - p_ii)/(N - 1)
-
-        P_mats[i,,t] <- off_prob
-        P_mats[i,i,t] <- p_ii
       }
     }
   }
 
   # Multivariate normal log-densities
-  log_densities <- matrix(nrow = N, ncol = T)
+  log_densities <- matrix(nrow = N, ncol = n_obs)
   for (m in 1:N) {
-    sigma_m <- sigma[,,m]
-    inv_sigma <- try(solve(sigma_m + diag(1e-8, K)), silent = TRUE)
-    if (inherits(inv_sigma, "try-error")) return(list(log_likelihood = -Inf))
+    sigma_m   <- sigma[,,m]
+    sigma_rdg <- sigma_m + diag(1e-8, K)   # ridge used consistently for inverse and log-det
+    inv_sigma <- try(solve(sigma_rdg), silent = TRUE)
+    if (inherits(inv_sigma, "try-error"))
+      return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
 
-    log_det <- determinant(sigma_m, logarithm = TRUE)$modulus[1]
+    log_det <- determinant(sigma_rdg, logarithm = TRUE)$modulus[1]
     centered <- as.matrix(y)
     inv_sigma <- as.matrix(inv_sigma)
-    centered <- apply(centered, 2, as.numeric)
+    centered <- matrix(apply(centered, 2, as.numeric), nrow = n_obs)
     inv_sigma <- matrix(as.numeric(inv_sigma), nrow = nrow(inv_sigma))
     quad_form <- rowSums((centered %*% inv_sigma) * centered)
     log_densities[m,] <- -0.5*(log_det + quad_form + K*log(2*pi))
   }
 
   # Filtering and smoothing
-  filtered <- matrix(0, N, T)
-  predicted <- matrix(0, N, T)
-  smoothed <- matrix(0, N, T)
-  xi <- rep(1/N, N)
+  filtered <- matrix(0, N, n_obs)
+  predicted <- matrix(0, N, n_obs)
+  smoothed <- matrix(0, N, n_obs)
+  xi <- if (is.null(xi_init)) rep(1/N, N) else xi_init / sum(xi_init)
   log_lik <- 0
 
-  for (t in 1:T) {
+  for (t in 1:n_obs) {
     P_t <- P_mats[,,t]
-    predicted[,t] <- P_t %*% xi
+    predicted[,t] <- t(P_t) %*% xi
 
-    likelihood <- exp(log_densities[,t])
-    filtered[,t] <- predicted[,t] * likelihood
-    sum_filtered <- sum(filtered[,t])
+    # Log-space update: factor out the largest log-density to avoid exp() underflow.
+    # exp(c_t) cancels in the normalisation, so filtered probs are unchanged; the
+    # log-likelihood increment log(sum_w) + c_t = log(sum predicted * exp(logdens)).
+    ld    <- log_densities[, t]
+    c_t   <- max(ld)
+    w     <- predicted[, t] * exp(ld - c_t)
+    sum_w <- sum(w)
 
-    if (sum_filtered <= 0) return(list(log_likelihood = -Inf))
+    if (!is.finite(sum_w) || sum_w <= 0)
+      return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
 
-    filtered[,t] <- filtered[,t] / sum_filtered
-    log_lik <- log_lik + log(sum_filtered)
+    filtered[,t] <- w / sum_w
+    log_lik <- log_lik + log(sum_w) + c_t
     xi <- filtered[,t]
   }
 
   # Smoothing
-  smoothed[,T] <- filtered[,T]
-  for (t in (T - 1):1) {
-    P_t1 <- P_mats[,, t + 1]
-    temp <- filtered[,t] * (t(P_t1) %*% (smoothed[, t + 1]/predicted[, t + 1]))
-    smoothed[,t] <- temp / sum(temp)
+  smoothed[,n_obs] <- filtered[,n_obs]
+  if (n_obs > 1L) {
+    for (t in (n_obs - 1):1) {
+      P_t1  <- P_mats[,, t + 1]
+      ratio <- smoothed[, t + 1] / pmax(predicted[, t + 1], .Machine$double.eps)
+      temp  <- filtered[, t] * (P_t1 %*% ratio)
+      s <- sum(temp)
+      if (!is.finite(s) || s < .Machine$double.eps)
+        return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
+      smoothed[, t] <- temp / s
+    }
   }
 
   list(
@@ -208,8 +256,10 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #'         followed by \eqn{N \times K(K-1)/2} correlation parameters, stacked
 #'         \emph{row-wise by regime} in \code{lower.tri} order.
 #'   \item \strong{With exogenous covariates} (\code{exog} provided): first
-#'         \eqn{N \times p} TVTP coefficients (\code{beta}, row \eqn{i} corresponds
-#'         to regime \eqn{i}), followed by \eqn{N \times K(K-1)/2} correlation parameters,
+#'         \eqn{N \times p} TVTP coefficients (\code{beta}) for \eqn{N=2}, or
+#'         \eqn{N \times (N-1)p} coefficients for \eqn{N \ge 3} (row \eqn{i}
+#'         holds \eqn{N-1} length-\eqn{p} softmax vectors; last logit = 0 reference),
+#'         followed by \eqn{N \times K(K-1)/2} correlation parameters,
 #'         stacked \emph{row-wise by regime} in \code{lower.tri} order.
 #' }
 #' @param y Numeric matrix \eqn{T \times K} of observations (e.g., standardized residuals).
@@ -228,9 +278,11 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #'           \item \emph{Fixed P (no \code{exog}):} \code{params} begins with transition
 #'                 parameters. For \eqn{N=2}, the implementation maps them to
 #'                 \eqn{P=\begin{pmatrix} p_{11} & 1-p_{11}\\ 1-p_{22} & p_{22}\end{pmatrix}}.
-#'           \item \emph{TVTP:} with \code{exog}, diagonal persistence is
-#'                 \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}; off-diagonals are equal
-#'                 and sum to \eqn{1-p_{ii,t}}.
+#'           \item \emph{TVTP:} with \code{exog}, for \eqn{N=2},
+#'                 \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
+#'                 \eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});
+#'                 for \eqn{N \ge 3}, a softmax over \eqn{N-1} free logit vectors per row
+#'                 with the \eqn{N}-th logit fixed at 0 (reference category).
 #'         }
 #'   \item \strong{Correlation build:} per regime, the lower-triangular vector is filled into
 #'         a symmetric correlation matrix. Non-positive-definite proposals or \eqn{|\rho|\ge 1}
@@ -270,13 +322,16 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL) 
 #'
 #' @export
 rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
+  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
   if (any(is.na(params)) || any(!is.finite(params))) return(1e10)
 
   # Parameter count calculation
-  n_p <- ifelse(is.null(exog), N * (N - 1), 0)  # Include transition params only when no exog
-  n_pairs <- K * (K - 1) / 2  # Number of correlation pairs
-  n_rho <- N * n_pairs  # Correlation parameters
-  n_beta <- if (!is.null(exog)) N * ncol(exog) else 0
+  n_p <- ifelse(is.null(exog), N * (N - 1), 0)
+  n_pairs <- K * (K - 1) / 2
+  n_rho <- N * n_pairs
+  n_beta <- if (!is.null(exog)) {
+    if (N == 2) N * ncol(exog) else N * (N - 1L) * ncol(exog)
+  } else 0
 
   # Parameter extraction
   if (is.null(exog)) {
@@ -288,14 +343,23 @@ rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
     # Build transition matrix
     P <- matrix(0, N, N)
     if (N == 2) {
+      if (any(trans_params < 0 | trans_params > 1)) return(1e10)
       P <- matrix(c(trans_params[1], 1 - trans_params[1],
                     1 - trans_params[2], trans_params[2]),
                   nrow = N, byrow = TRUE)
+    } else if (N == 3) {
+      for (i in 1:N) {
+        p_i1 <- trans_params[2L * (i - 1L) + 1L]
+        p_i2 <- trans_params[2L * (i - 1L) + 2L]
+        p_i3 <- 1 - p_i1 - p_i2
+        if (p_i1 < 0 || p_i2 < 0 || p_i3 < 0) return(1e10)
+        P[i, ] <- c(p_i1, p_i2, p_i3)
+      }
     }
   } else {
-    # With exogenous variables
-    beta <- matrix(params[1:n_beta], nrow = N)
-    rho_matrix <- matrix(params[(n_beta + 1):(n_beta + n_rho)], nrow = N)
+    # With exogenous variables (N=2: logistic beta; N=3: softmax beta)
+    beta <- matrix(params[1:n_beta], nrow = N, byrow = TRUE)
+    rho_matrix <- matrix(params[(n_beta + 1):(n_beta + n_rho)], nrow = N, byrow = TRUE)
     P <- NULL
   }
 

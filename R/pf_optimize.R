@@ -16,12 +16,17 @@
 #' @param long_only Logical. If \code{TRUE} (default), imposes long-only MV with the full-investment
 #'   constraint \eqn{\sum_i w_i = 1} and \eqn{w_i \ge 0}. If \code{FALSE}, solves unconstrained MV
 #'   with only \eqn{\sum_i w_i = 1}.
+#' @param lag Logical. If \code{FALSE} (default), the period-\eqn{t} weights (built from
+#'   \eqn{\Sigma_t}) are applied to the same period's returns \code{y[t, ]} (in-sample
+#'   evaluation). If \code{TRUE}, weights chosen at \eqn{t-1} earn the period-\eqn{t} return
+#'   (\code{sum(y[t, ] * weights[t-1, ])}) and the first period's return is \code{NA}; use
+#'   \code{lag = TRUE} for a look-ahead-free out-of-sample backtest.
 #'
 #' @returns An object of class \code{"minvar_portfolio"}:
 #' \describe{
 #'   \item{weights}{\eqn{T \times K} matrix of MV weights (one row per time).}
 #'   \item{cov_matrices}{List of length \eqn{T} with the per-period \eqn{K \times K} covariance matrices.}
-#'   \item{volatility}{Realized standard deviation of portfolio returns (see Note on units).}
+#'   \item{volatility}{Realized standard deviation of portfolio returns (same units as \code{y}).}
 #'   \item{y}{The input \code{y} matrix (coerced to \eqn{T \times K}).}
 #'   \item{K}{Number of assets.}
 #' }
@@ -29,7 +34,10 @@
 #' @details
 #' \itemize{
 #'   \item \strong{Covariance build:} For each \eqn{t}, a correlation matrix \eqn{R_t}
-#'         is reconstructed ... Let \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}
+#'         is reconstructed from \code{predicted\_corr[t, ]} (columns in \code{combn(K, 2)} order)
+#'         by placing each pairwise correlation in the corresponding off-diagonal entries of a
+#'         \eqn{K \times K} identity matrix.
+#'         Let \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}
 #'         and \eqn{\Sigma_t = D_t R_t D_t}.
 #'   \item \strong{Optimization:} Minimize \eqn{\tfrac{1}{2} w^\top \Sigma_t w} subject to
 #'         \eqn{\mathbf{1}^\top w = 1} and, if \code{long_only}, \eqn{w \ge 0}
@@ -37,11 +45,6 @@
 #'   \item \strong{Failure handling:} If the QP fails at time \(t\), weights default to equal
 #'         allocation \(w_i = 1/K\).
 #' }
-#'
-#' @section Note on units:
-#' The realized portfolio return at time \(t\) is computed as \code{sum(y[t, ] * weights[t, ]) / 100}.
-#' This assumes \code{y} is expressed in \% (percentage) units. If your \code{y} is already in decimals,
-#' remove the \code{/ 100} in the implementation or convert inputs accordingly.
 #'
 #' @examples
 #' # Toy example with K = 3
@@ -68,7 +71,7 @@
 #' @importFrom stats sd
 #' @export
 rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
-                     long_only = TRUE) {
+                     long_only = TRUE, lag = FALSE) {
 
   if (!requireNamespace("quadprog", quietly = TRUE)) {
     stop("Package 'quadprog' is required. Install via install.packages('quadprog').")
@@ -86,13 +89,13 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
     nrow(sigma_matrix) == nrow(y)
   )
 
-  T <- nrow(y)
+  n_obs <- nrow(y)
   cor_pairs <- combn(K, 2, simplify = FALSE)
-  portfolio_weights <- matrix(NA, nrow = T, ncol = K)
-  portfolio_returns <- numeric(T)
-  cov_matrices <- vector("list", T)
+  portfolio_weights <- matrix(NA, nrow = n_obs, ncol = K)
+  portfolio_returns <- numeric(n_obs)
+  cov_matrices <- vector("list", n_obs)
 
-  for (t in 1:T) {
+  for (t in 1:n_obs) {
     R <- diag(K)
     for (i in seq_along(cor_pairs)) {
       p <- cor_pairs[[i]]
@@ -122,7 +125,11 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
     })
 
     portfolio_weights[t, ] <- weights
-    portfolio_returns[t] <- sum(y[t, ] * weights) / 100
+    portfolio_returns[t] <- if (lag) {
+      if (t == 1L) NA_real_ else sum(y[t, ] * portfolio_weights[t - 1L, ])
+    } else {
+      sum(y[t, ] * weights)
+    }
   }
 
   structure(list(
@@ -147,6 +154,11 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #' @param y Numeric matrix \eqn{T \times K} of asset returns (for realized stats).
 #' @param long_only Logical. If \code{TRUE}, impose \eqn{w \ge 0} and \eqn{\sum_i w_i = 1};
 #'   otherwise bounds are \eqn{-1 \le w_i \le 1} with \eqn{\sum_i w_i = 1}.
+#' @param lag Logical. If \code{FALSE} (default), the period-\eqn{t} weights (built from
+#'   \eqn{\Sigma_t}) are applied to the same period's returns \code{y[t, ]} (in-sample
+#'   evaluation). If \code{TRUE}, weights chosen at \eqn{t-1} earn the period-\eqn{t} return
+#'   (\code{sum(y[t, ] * weights[t-1, ])}) and the first period's return is \code{NA}; use
+#'   \code{lag = TRUE} for a look-ahead-free out-of-sample backtest.
 #'
 #' @return
 #' \describe{
@@ -198,7 +210,7 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
 #'
 #' @export
 rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
-                     long_only = TRUE) {
+                     long_only = TRUE, lag = FALSE) {
   if (!requireNamespace("Rsolnp", quietly = TRUE)) {
     stop("Package 'Rsolnp' is required. Install via install.packages('Rsolnp').")
   }
@@ -259,7 +271,11 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
     })
 
     portfolio_weights[t, ] <- weights
-    portfolio_returns[t] <- sum(y[t, ] * weights)
+    portfolio_returns[t] <- if (lag) {
+      if (t == 1L) NA_real_ else sum(y[t, ] * portfolio_weights[t - 1L, ])
+    } else {
+      sum(y[t, ] * weights)
+    }
 
     dr <- sum(weights * vol_vec) / sqrt(t(weights) %*% cov_t %*% weights)
     diversification_ratios[t] <- ifelse(is.nan(dr), 1, dr)
@@ -272,6 +288,6 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
     mean_diversification = mean(diversification_ratios, na.rm = TRUE),
     K = K,
     assets = value_cols,
-    volatility = sd(portfolio_returns)
+    volatility = sd(portfolio_returns, na.rm = TRUE)
   ), class = "maxdiv_portfolio")
 }

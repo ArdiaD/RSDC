@@ -14,8 +14,10 @@ rsdc_likelihood(params, y, exog = NULL, K, N)
 followed by \eqn{N \times K(K-1)/2} correlation parameters, stacked
 \emph{row-wise by regime} in \code{lower.tri} order.
 \item \strong{With exogenous covariates} (\code{exog} provided): first
-\eqn{N \times p} TVTP coefficients (\code{beta}, row \eqn{i} corresponds
-to regime \eqn{i}), followed by \eqn{N \times K(K-1)/2} correlation parameters,
+\eqn{N \times p} TVTP coefficients (\code{beta}) for \eqn{N=2}, or
+\eqn{N \times (N-1)p} coefficients for \eqn{N \ge 3} (row \eqn{i}
+holds \eqn{N-1} length-\eqn{p} softmax vectors; last logit = 0 reference),
+followed by \eqn{N \times K(K-1)/2} correlation parameters,
 stacked \emph{row-wise by regime} in \code{lower.tri} order.
 }}
 
@@ -45,9 +47,11 @@ Likelihood evaluation uses the Hamilton (1989) filter.
 \item \emph{Fixed P (no \code{exog}):} \code{params} begins with transition
 parameters. For \eqn{N=2}, the implementation maps them to
 \eqn{P=\begin{pmatrix} p_{11} & 1-p_{11}\\ 1-p_{22} & p_{22}\end{pmatrix}}.
-\item \emph{TVTP:} with \code{exog}, diagonal persistence is
-\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}; off-diagonals are equal
-and sum to \eqn{1-p_{ii,t}}.
+\item \emph{TVTP:} with \code{exog}, for \eqn{N=2},
+\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
+\eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});
+for \eqn{N \ge 3}, a softmax over \eqn{N-1} free logit vectors per row
+with the \eqn{N}-th logit fixed at 0 (reference category).
 }
 \item \strong{Correlation build:} per regime, the lower-triangular vector is filled into
 a symmetric correlation matrix. Non-positive-definite proposals or \eqn{|\rho|\ge 1}

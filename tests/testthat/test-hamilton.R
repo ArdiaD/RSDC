@@ -39,4 +39,23 @@ test_that("rsdc_hamilton works with TVTP (X, beta)", {
   expect_equal(dim(fit$smoothed_probs), c(N, nrow(y)))
 })
 
+test_that("rsdc_hamilton xi_init warm-start produces valid output", {
+  set.seed(42)
+  y <- toy_residuals(T = 30, K = 3)
+  K <- ncol(y); N <- 2
+  rho <- toy_rho_matrix(K)
+  P   <- toy_P()
 
+  # Pass 1: IS slice — extract terminal filtered state
+  res1    <- rsdc_hamilton(y = y[1:20, ], rho_matrix = rho, K = K, N = N, P = P)
+  xi_term <- res1$filtered_probs[, 20]
+
+  # Pass 2: OOS slice initialised from IS terminal state
+  res2 <- rsdc_hamilton(y = y[21:30, ], rho_matrix = rho, K = K, N = N, P = P,
+                        xi_init = xi_term)
+
+  expect_equal(dim(res2$filtered_probs), c(N, 10))
+  expect_equal(dim(res2$smoothed_probs), c(N, 10))
+  expect_true(is.finite(res2$log_likelihood))
+  expect_true(all(abs(colSums(res2$smoothed_probs) - 1) < 1e-10))
+})
