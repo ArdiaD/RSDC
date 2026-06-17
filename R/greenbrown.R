@@ -5,7 +5,7 @@
 #'
 #' @format A data frame with 2266 rows and three columns:
 #' \describe{
-#'   \item{DATE}{Dates ranging from 2014-01-02 to 2024-12-30.}
+#'   \item{DATE}{Dates ranging from 2014-01-02 to 2022-12-30.}
 #'   \item{return_green}{Numeric returns for the green portfolio.}
 #'   \item{return_brown}{Numeric returns for the brown portfolio.}
 #' }
