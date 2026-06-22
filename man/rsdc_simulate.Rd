@@ -7,15 +7,19 @@
 rsdc_simulate(n, X, beta, mu, sigma, N, seed = NULL)
 }
 \arguments{
-\item{n}{Integer. Number of time steps to simulate.}
+\item{n}{Integer. Number of time steps to simulate; must be at least 2.}
 
 \item{X}{Numeric matrix \eqn{n \times p} of covariates used to form the transition
-probabilities. Row \code{X[t, ]} corresponds to covariates available at time \code{t}.
-Only rows \code{1:(n-1)} are used to transition from \code{t-1} to \code{t}.}
+probabilities. Row \code{X[t, ]} is used at time \eqn{t \ge 2} to form \eqn{P_t};
+row 1 is not used (no transition out of the initial state).}
 
-\item{beta}{Numeric array \eqn{N \times N \times p}. Softmax coefficients for the
-multinomial transition model; \code{beta[i, j, ]} parameterizes the transition
-from state \eqn{i} to state \eqn{j}.}
+\item{beta}{Numeric matrix \eqn{N \times (N-1) \cdot p}. Transition coefficients
+packed row-wise by regime, matching the parameterisation of
+\code{\link{rsdc_hamilton}} and \code{\link{rsdc_estimate}}. For \eqn{N=2},
+each row is a length-\eqn{p} logistic vector:
+\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N=3},
+each row packs \eqn{N-1=2} softmax vectors of length \eqn{p}; the \eqn{N}-th
+logit is the reference (zero).}
 
 \item{mu}{Numeric matrix \eqn{N \times K}. Regime-specific mean vectors.}
 
@@ -44,29 +48,39 @@ observations are drawn from regime-specific Gaussian distributions.
 }
 \details{
 \itemize{
-\item \strong{Initial state and first draw:} The initial regime \eqn{S_1} is sampled
-uniformly; the first observation \eqn{y_1} is drawn from
-\eqn{\mathcal{N}(\mu_{S_1}, \Sigma_{S_1})}.
-\item \strong{TVTP via softmax:} For \eqn{t \ge 2}, the row \eqn{i} of \eqn{P_t} is
-\deqn{P_t(i, j) = \frac{\exp\!\big(X_{t-1}^\top \beta_{i,j}\big)}
-                          {\sum_{h=1}^N \exp\!\big(X_{t-1}^\top \beta_{i,h}\big)}\,,}
-computed with log-sum-exp stabilization.
+\item \strong{Initial state and first draw:} The initial regime \eqn{S_1} is drawn from
+\eqn{t(P_1)\,\pi_0} with \eqn{\pi_0 = (1/N,\dots,1/N)} and \eqn{P_1} built from
+\eqn{X_1} via the same logistic/softmax link, matching the Hamilton-filter t=1
+prior in \code{\link{rsdc_hamilton}}; the first observation \eqn{y_1} is drawn
+from \eqn{\mathcal{N}(\mu_{S_1}, \Sigma_{S_1})}.
+\item \strong{TVTP transition:} For \eqn{t \ge 2} and \eqn{N=2},
+\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}; for
+\eqn{N \ge 3}, a softmax is used with \eqn{N-1} free logit vectors per
+row and the \eqn{N}-th logit fixed at zero (reference category).
+Both use log-sum-exp stabilisation.
 \item \strong{Sampling:} Given \eqn{S_{t-1}}, draw \eqn{S_t} from the categorical
 distribution with probabilities \eqn{P_t(S_{t-1}, \cdot)} and
 \eqn{y_t \sim \mathcal{N}(\mu_{S_t}, \Sigma_{S_t})}.
+\item \strong{First-slice NA:} \code{transition_matrices[,,1]} is always \code{NA}.
+At \eqn{t=1} there is no predecessor state, so no transition matrix is computed.
+The assignment loop begins at \eqn{t=2}. Users iterating over the returned array
+should skip the first slice or use \code{transition_matrices[,,2:n]}.
 }
 }
 \note{
 Requires \pkg{mvtnorm} for multivariate normal sampling (called as \code{mvtnorm::rmvnorm}).
+
+X-timing: uses \code{X[t, ]} (contemporaneous) to form \eqn{P_t}, consistent with
+\code{\link{rsdc_hamilton}}.
 }
 \examples{
 set.seed(123)
 n <- 200; K <- 3; N <- 2; p <- 2
 X <- cbind(1, scale(seq_len(n)))
 
-beta <- array(0, dim = c(N, N, p))
-beta[1, 1, ] <- c(1.2,  0.0)
-beta[2, 2, ] <- c(1.0, -0.1)
+beta <- matrix(0, nrow = N, ncol = (N - 1) * p)
+beta[1, ] <- c(1.2,  0.0)
+beta[2, ] <- c(1.0, -0.1)
 
 mu <- rbind(c(0, 0, 0),
             c(0, 0, 0))

@@ -4,7 +4,16 @@
 \alias{rsdc_hamilton}
 \title{Hamilton Filter (Fixed P or TVTP)}
 \usage{
-rsdc_hamilton(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL)
+rsdc_hamilton(
+  y,
+  X = NULL,
+  beta = NULL,
+  rho_matrix,
+  K,
+  N,
+  P = NULL,
+  xi_init = NULL
+)
 }
 \arguments{
 \item{y}{Numeric matrix \eqn{T \times K} of observations (e.g., standardized residuals/returns).
@@ -12,8 +21,12 @@ Columns are treated as mean-zero with unit variance; only the correlation struct
 
 \item{X}{Optional numeric matrix \eqn{T \times p} of covariates for TVTP. Required if \code{beta} is supplied.}
 
-\item{beta}{Optional numeric matrix \eqn{N \times p}. TVTP coefficients; row \eqn{i} governs
-persistence of regime \eqn{i} via \code{plogis(X[t, ] \%*\% beta[i, ])}.}
+\item{beta}{Optional numeric matrix of TVTP coefficients.
+For \eqn{N=2}: an \eqn{N \times p} matrix; row \eqn{i} gives the logistic coefficient
+vector so that \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}.
+For \eqn{N \ge 3}: an \eqn{N \times (N-1)p} matrix packed row-wise; row \eqn{i}
+contains \eqn{N-1} consecutive length-\eqn{p} softmax vectors; the \eqn{N}-th
+logit is fixed at 0 (reference category).}
 
 \item{rho_matrix}{Numeric matrix \eqn{N \times C} of regime correlation parameters, where
 \eqn{C = K(K-1)/2}. Each row is the lower-triangular part (by \code{lower.tri}) of a regime's
@@ -24,6 +37,13 @@ correlation matrix.}
 \item{N}{Integer. Number of regimes.}
 
 \item{P}{Optional \eqn{N \times N} fixed transition matrix. Used only when \code{X} or \code{beta} is \code{NULL}.}
+
+\item{xi_init}{Optional numeric vector of length \code{N}. If supplied, the
+forward filter is initialised from this vector (normalised internally to sum
+to 1) instead of the default uniform \eqn{1/N}. Intended for two-pass
+out-of-sample forecasting: run the filter on the in-sample period first,
+extract the terminal column of \code{filtered_probs}, and pass it here to
+initialise the out-of-sample filter run. Must be non-negative and finite.}
 }
 \value{
 A list with:
@@ -38,7 +58,8 @@ A list with:
 \description{
 Runs the Hamilton (1989) filter for a multivariate regime-switching \emph{correlation} model.
 Supports either a fixed (time-invariant) transition matrix \eqn{P} or time-varying transition
-probabilities (TVTP) built from exogenous covariates \code{X} via a logistic link.
+probabilities (TVTP) built from exogenous covariates \code{X}: a logistic link for \eqn{N=2}
+or a softmax link for \eqn{N \ge 3}.
 Returns filtered/smoothed regime probabilities and the log-likelihood.
 }
 \details{
@@ -49,16 +70,23 @@ from \code{rho_matrix[m, ]} (lower-triangular fill + symmetrization). Non-PD pro
 \itemize{
 \item \emph{Fixed P:} If \code{X} or \code{beta} is missing, a constant \eqn{P} is used
 (user-provided via \code{P}; otherwise uniform \eqn{1/N} rows).
-\item \emph{TVTP:} With \code{X} and \code{beta}, diagonal entries use
-\code{plogis(X[t, ] \%*\% beta[i, ])}. Off-diagonals are equal and sum to \eqn{1 - p_{ii,t}}.
-For \eqn{N=1}, \eqn{P_t = [1]}.
+\item \emph{TVTP:} With \code{X} and \code{beta}:
+for \eqn{N=2}, \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
+\eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});
+for \eqn{N \ge 3}, a softmax over \eqn{N-1} free logit vectors per row with
+the \eqn{N}-th logit fixed at 0 (reference category); log-sum-exp stabilised.
 }
 \item \strong{Numerical safeguards:} A small ridge is added before inversion; if filtering
 degenerates at a time step, \code{log_likelihood = -Inf} is returned.
 }
 }
 \note{
-TVTP uses a logistic link on the diagonal; off-diagonals are equal by construction.
+For \eqn{N=2}, TVTP uses a logistic link on the diagonal; off-diagonals follow by
+complement. For \eqn{N \ge 3}, a full softmax is used with \eqn{(N-1)} free logit
+vectors per row; all entries are independently determined.
+
+X-timing: uses \code{X[t, ]} (contemporaneous) to form \eqn{P_t}, consistent with
+\code{\link{rsdc_simulate}}.
 }
 \examples{
 set.seed(1)

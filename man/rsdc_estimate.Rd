@@ -31,7 +31,8 @@ rsdc_estimate(
 \item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"}).}
 \item{\code{correlations}}{Regime lower-triangular correlations.}
 \item{\code{covariances}}{Array of full correlation matrices.}
-\item{\code{log_likelihood}}{Maximized log-likelihood.}
+\item{\code{log_likelihood}}{In-sample log-likelihood; full-sample when \code{out_of_sample = FALSE}.}
+\item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30\%, or \code{NULL} when \code{out_of_sample = FALSE}.}
 \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}).}
 }
 }
@@ -47,7 +48,7 @@ Unified front-end that dispatches to one of three estimators:
 \itemize{
 \item \strong{Method selection:} \code{match.arg()} validates \code{method}.
 \item \strong{Inputs:} \code{"tvtp"} requires non-NULL \code{X}; \code{N} is ignored for \code{"const"}.
-\item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\\% is used for fitting.
+\item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\% is used for fitting.
 }
 }
 \examples{

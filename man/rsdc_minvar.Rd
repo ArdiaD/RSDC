@@ -4,7 +4,14 @@
 \alias{rsdc_minvar}
 \title{Minimum-Variance Portfolio (Rolling Weights)}
 \usage{
-rsdc_minvar(sigma_matrix, value_cols, predicted_corr, y, long_only = TRUE)
+rsdc_minvar(
+  sigma_matrix,
+  value_cols,
+  predicted_corr,
+  y,
+  long_only = TRUE,
+  lag = FALSE
+)
 }
 \arguments{
 \item{sigma_matrix}{Numeric matrix \eqn{T \times K} of forecasted \emph{volatilities}
@@ -22,13 +29,19 @@ Used only to compute the realized portfolio volatility.}
 \item{long_only}{Logical. If \code{TRUE} (default), imposes long-only MV with the full-investment
 constraint \eqn{\sum_i w_i = 1} and \eqn{w_i \ge 0}. If \code{FALSE}, solves unconstrained MV
 with only \eqn{\sum_i w_i = 1}.}
+
+\item{lag}{Logical. If \code{FALSE} (default), the period-\eqn{t} weights (built from
+\eqn{\Sigma_t}) are applied to the same period's returns \code{y[t, ]} (in-sample
+evaluation). If \code{TRUE}, weights chosen at \eqn{t-1} earn the period-\eqn{t} return
+(\code{sum(y[t, ] * weights[t-1, ])}) and the first period's return is \code{NA}; use
+\code{lag = TRUE} for a look-ahead-free out-of-sample backtest.}
 }
 \value{
 An object of class \code{"minvar_portfolio"}:
 \describe{
 \item{weights}{\eqn{T \times K} matrix of MV weights (one row per time).}
 \item{cov_matrices}{List of length \eqn{T} with the per-period \eqn{K \times K} covariance matrices.}
-\item{volatility}{Realized standard deviation of portfolio returns (see Note on units).}
+\item{volatility}{Realized standard deviation of portfolio returns (same units as \code{y}).}
 \item{y}{The input \code{y} matrix (coerced to \eqn{T \times K}).}
 \item{K}{Number of assets.}
 }
@@ -42,7 +55,10 @@ solver fails at a time step, the routine falls back to equal weights.
 \details{
 \itemize{
 \item \strong{Covariance build:} For each \eqn{t}, a correlation matrix \eqn{R_t}
-is reconstructed ... Let \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}
+is reconstructed from \code{predicted\_corr[t, ]} (columns in \code{combn(K, 2)} order)
+by placing each pairwise correlation in the corresponding off-diagonal entries of a
+\eqn{K \times K} identity matrix.
+Let \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}
 and \eqn{\Sigma_t = D_t R_t D_t}.
 \item \strong{Optimization:} Minimize \eqn{\tfrac{1}{2} w^\top \Sigma_t w} subject to
 \eqn{\mathbf{1}^\top w = 1} and, if \code{long_only}, \eqn{w \ge 0}
@@ -51,13 +67,6 @@ and \eqn{\Sigma_t = D_t R_t D_t}.
 allocation \(w_i = 1/K\).
 }
 }
-\section{Note on units}{
-
-The realized portfolio return at time \(t\) is computed as \code{sum(y[t, ] * weights[t, ]) / 100}.
-This assumes \code{y} is expressed in \\% (percentage) units. If your \code{y} is already in decimals,
-remove the \code{/ 100} in the implementation or convert inputs accordingly.
-}
-
 \examples{
 # Toy example with K = 3
 T <- 50; K <- 3

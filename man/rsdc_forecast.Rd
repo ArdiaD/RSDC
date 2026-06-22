@@ -43,7 +43,15 @@ or \code{beta} (\code{"tvtp"}); include \code{log_likelihood} for BIC computatio
 \item{\code{sigma_matrix}}{\eqn{T^\ast \times K} slice aligned to the forecast horizon.}
 \item{\code{cov_matrices}}{List of \eqn{K \times K} covariance matrices \eqn{\Sigma_t = D_t R_t D_t}.}
 \item{\code{predicted_correlations}}{\eqn{T^\ast \times \binom{K}{2}} pairwise correlations in \code{combn(K, 2)} order.}
-\item{\code{BIC}}{Bayesian Information Criterion \eqn{\mathrm{BIC} = \log(n)\,k - 2\,\ell}.}
+\item{\code{BIC}}{Information criterion \eqn{\log(n)\,k - 2\,\ell}.
+When \code{out_of_sample = TRUE} and \code{final_params$log_likelihood_oos} is non-\code{NULL},
+uses the OOS log-likelihood and OOS sample size; otherwise uses the IS values.
+\strong{Caveat:} with \code{out_of_sample = TRUE} this is an out-of-sample predictive
+score (held-out log-likelihood penalized by the IS parameter count), \emph{not} a
+conventional in-sample BIC; use it only to compare models fit on the same split, and
+do not interpret it as a textbook BIC. The backends (\code{\link{rsdc_estimate}})
+hardcode a 70/30 split, so the OOS log-likelihood is only fully consistent with
+\code{rsdc_forecast} when the default \code{threshold = 0.7} is used.}
 \item{\code{y}}{\eqn{T^\ast \times K} residual matrix aligned to the forecast horizon.}
 }
 }
@@ -58,14 +66,20 @@ Generates per-period correlation and covariance matrices from a fitted model:
 fraction and forecast on the remainder.
 \item \strong{Correlation paths:}
 \itemize{
-\item \code{"const"} — empirical correlation of \code{residuals}, repeated across time.
-\item \code{"noX"}/\code{"tvtp"} — smoothed-probability weighted average of regime correlations.
+\item \code{"const"} — constant correlation from \code{final_params$correlations[1,]}, repeated across time.
+\item \code{"noX"}/\code{"tvtp"} — regime-probability weighted average of regime
+correlations. To avoid look-ahead, out-of-sample forecasts
+(\code{out_of_sample = TRUE}) weight by \emph{filtered} probabilities
+\eqn{\Pr(S_t \mid \Omega_t)}; the full-sample case uses \emph{smoothed}
+probabilities \eqn{\Pr(S_t \mid \Omega_T)}. The returned
+\code{smoothed_probs} field always contains the smoothed probabilities.
 }
 \item \strong{Covariance build:} Reconstruct \eqn{R_t} from the pairwise vector (columns ordered by
 \code{combn(K, 2)}), set \eqn{D_t = \mathrm{diag}(\sigma_{t,1},\dots,\sigma_{t,K})}, and
 \eqn{\Sigma_t = D_t R_t D_t}.
 \item \strong{BIC:} Parameter count \eqn{k} is
-\code{N * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"},
+\code{N * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"} with \eqn{N=2},
+\code{N * (N-1) * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"} with \eqn{N=3},
 \code{N * (N - 1) + N * K * (K - 1) / 2} for \code{"noX"},
 and \code{K * (K - 1) / 2} for \code{"const"}.
 }

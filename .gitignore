@@ -1,71 +1,58 @@
-.Rproj.user
-inst/doc
-.DS_Store
-.Rhistory
-
-inst/lib
-.Rproj.user
-src/*.o
-src/*.so
-src/*.dll
-src/symbols.rds
-.Rhistory
-.RData
-
-## QtCreator
-Rcpp.pro
-Rcpp.pro.user
-*.autosave
-.#*
-inst/.DS_Store
-
-# Retrieved 2017-Oct-12 from https://github.com/github/gitignore/blob/master/R.gitignore
-# Licensed under CC0-1.0 https://github.com/github/gitignore/blob/master/LICENSE
-# This file and the .Rbuildignore
-#.Rbuildignore
-#.gitignore
-# R project folder
-*.Rproj
-# Folder containing logo
-inst/rawdata
-inst/sticker
-# Folder containing data (because of confidentiality)
-data/englandwales.rda
-data/french.rda
-data/idl.rda
-data/idl2021.rda
-data/italian.rda
 # History files
 .Rhistory
 .Rapp.history
-# Session Data files
+
+# Session data files
 .RData
+.RDataTmp
 .Ruserdata
+
+# R environment
+.Renviron
+
 # Example code in package build process
 *-Ex.R
+
 # Output files from R CMD build
 /*.tar.gz
+
 # Output files from R CMD check
-/*.Rcheck/
+*.Rcheck/
+
 # RStudio files
 .Rproj.user/
-# produced vignettes
+
+# Produced vignettes
 vignettes/*.html
 vignettes/*.pdf
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+
+# OAuth2 token (httr)
 .httr-oauth
-# knitr and R markdown default cache directories
-/*_cache/
+
+# knitr / R Markdown caches and temporaries
+*_cache/
 /cache/
-# Temporary files created by R markdown
 *.utf8.md
 *.knit.md
-# File that is not used and is superceded
-R/npsurv.R
-R/parametric_backup.R
-tests
+
+# Package build / install leftovers
 inst/doc
-aucun
 /doc/
 /Meta/
-TODO
+
+# pkgdown site
+docs/
+
+# macOS / editor cruft
+.DS_Store
+
+# Internal working notes (not for publication)
+SESSION_LOG.txt
+
+# Generated reproduction outputs — regenerate with the scripts in inst/.
+# Only generated data/figures are ignored; the .R scripts and the LaTeX
+# report (inst/empirical/results/*.tex) stay tracked.
+inst/simulation/plots/
+inst/simulation/results/
+inst/empirical/results/*.rds
+inst/empirical/results/*.csv

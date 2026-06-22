@@ -1,8 +1,9 @@
 #' Regime-Switching Correlation (TVTP) — DEoptim + L-BFGS-B
 #'
 #' Estimates a multivariate correlation model with \emph{time-varying transition probabilities} (TVTP).
-#' Regime persistence \eqn{p_{ii,t}} is modeled via a logistic link on exogenous covariates \code{X};
-#' off-diagonal transition probabilities are set equal to \eqn{(1 - p_{ii,t})/(N-1)}. Correlations are
+#' Regime persistence is modeled via a logistic link for \eqn{N=2} or a softmax for \eqn{N \ge 3}
+#' on exogenous covariates \code{X}. For \eqn{N=2}, off-diagonals equal \eqn{(1-p_{ii,t})/(N-1)};
+#' for \eqn{N \ge 3}, all entries are independently determined by the softmax. Correlations are
 #' regime-specific and reconstructed from lower-triangular parameters. Optimization uses global search
 #' (\pkg{DEoptim}) followed by local refinement (L-BFGS-B).
 #'
@@ -19,19 +20,28 @@
 #'
 #' @returns A list with:
 #' \describe{
-#'   \item{transition_matrix}{Average \eqn{N \times N} transition matrix evaluated at \code{colMeans(X)}.}
+#'   \item{transition_matrix}{Representative \eqn{N \times N} transition matrix evaluated at
+#'     the in-sample covariate means (\code{colMeans} of the estimation window; the first 70\%
+#'     when \code{out_of_sample = TRUE}). This is a point summary at the mean covariate, \emph{not} the
+#'     time-average \eqn{\frac{1}{T}\sum_t P_t}; under the nonlinear logit/softmax link the
+#'     two differ (Jensen's inequality). The full per-period dynamics are governed by \code{beta}.}
 #'   \item{means}{\eqn{N \times K} zeros (placeholders; means are not estimated).}
 #'   \item{volatilities}{\eqn{N \times K} ones (placeholders; vols are not estimated).}
 #'   \item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations, \eqn{C = K(K-1)/2}.}
 #'   \item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
-#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
-#'   \item{beta}{\eqn{N \times p} matrix of TVTP coefficients.}
+#'   \item{log_likelihood}{In-sample log-likelihood (numeric scalar); full-sample when \code{out_of_sample = FALSE}.}
+#'   \item{log_likelihood_oos}{OOS log-likelihood evaluated on the held-out 30\% (numeric scalar),
+#'     or \code{NULL} when \code{out_of_sample = FALSE}.}
+#'   \item{beta}{\eqn{N \times p} matrix of TVTP coefficients for \eqn{N=2};
+#'     \eqn{N \times (N-1)p} for \eqn{N \ge 3}, packed row-wise.}
 #' }
 #'
 #' @details
 #' \itemize{
-#'   \item \strong{TVTP parameterization:} diagonal entries use \code{plogis(X \%*\% beta[i, ])};
-#'         off-diagonals are equal and sum to one.
+#'   \item \strong{TVTP parameterization:} for \eqn{N=2}, diagonal entries use
+#'         \code{plogis(X \%*\% beta[i, ])} and off-diagonals are equal;
+#'         for \eqn{N \ge 3}, a softmax over \eqn{(N-1)} free beta vectors per row,
+#'         with all entries independently determined.
 #'   \item \strong{Bounds:} \eqn{\beta \in [-10, 10]} elementwise; correlations \eqn{\in (-1, 1)}.
 #'   \item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
 #'   \item \strong{Numerical safeguards:} tiny ridge is added in inverses; non-PD proposals are penalized.
@@ -51,6 +61,8 @@
 #' @importFrom stats optim plogis
 #' @noRd
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
+  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
+  stopifnot(is.matrix(residuals))
 
   con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
@@ -58,11 +70,12 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   # Parameter setup
   K <- ncol(residuals)
   p <- ncol(X)
-  n_beta <- N * p
+  # N=2: one logistic beta vector per regime; N=3: (N-1) softmax beta vectors per regime row
+  n_beta <- if (N == 2) N * p else N * (N - 1L) * p
   n_rho <- N * (K * (K - 1) / 2)
   rho_indices <- (n_beta + 1):(n_beta + n_rho)
 
-  # Bounds with numerical stability
+  # Bounds (beta: [-10, 10] for all N; rho: (-1, 1))
   bounds <- list(
     lower = c(rep(-10, n_beta), rep(-1, n_rho)),
     upper = c(rep(10, n_beta), rep(1, n_rho))
@@ -70,11 +83,11 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 
   # Out-of-sample handling (fixed indexing)
   if (out_of_sample) {
-    is_cut <- round(0.7 * nrow(residuals))
-    residuals_is <- residuals[1:is_cut, ]
-    residuals_oos <- residuals[(is_cut + 1):nrow(residuals), ]
-    X_is <- X[1:is_cut, ]
-    X_oos <- X[(is_cut + 1):nrow(X), ]
+    is_cut        <- round(0.7 * nrow(residuals))
+    residuals_is  <- residuals[1:is_cut, , drop = FALSE]
+    residuals_oos <- residuals[(is_cut + 1):nrow(residuals), , drop = FALSE]
+    X_is  <- X[1:is_cut, , drop = FALSE]
+    X_oos <- X[(is_cut + 1):nrow(X), , drop = FALSE]
     y_optim <- residuals_is
     X_optim <- X_is
   } else {
@@ -95,9 +108,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
       F = 0.8,
       CR = 0.9,
       trace = con$do_trace,
-      parallelType = 1,
-      parVar = c("rsdc_hamilton", "rsdc_likelihood", "plogis"),
-      packages = c("mvtnorm"),
+      parallelType = 0,
       reltol = 1e-8,
       steptol = 50
     ),
@@ -131,22 +142,38 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   })
   sorted_states <- order(corr_means)
 
+  # beta_dim: parameters per regime row in the flat vector
+  beta_dim <- if (N == 2) p else (N - 1L) * p
+
   if (!all(sorted_states == 1:N)) {
-    # Reorder parameters
-    optim_params <- c(
-      # Betas
-      unlist(lapply(sorted_states, function(s) {
-        optim_params[((s - 1)*p + 1):(s*p)]
-      })),
-      # Rhos
-      unlist(lapply(sorted_states, function(s) {
-        optim_params[rho_indices][((s - 1)*C_per_state + 1):(s*C_per_state)]
+    if (N == 2L) {
+      beta_reordered <- unlist(lapply(sorted_states, function(s)
+        optim_params[((s - 1L) * beta_dim + 1L):(s * beta_dim)]))
+    } else {
+      # N=3: beta columns must also be permuted and shifted for the new reference.
+      # new_beta[new_row_i, new_col_j] = old_beta[s_i, s_j] - old_beta[s_i, s_N]
+      # where s_i = sorted_states[i], s_j = sorted_states[j], s_N = sorted_states[N].
+      ref_col <- sorted_states[N]
+      beta_reordered <- unlist(lapply(sorted_states, function(s) {
+        old_betas <- lapply(seq_len(N), function(col) {
+          if (col < N)
+            optim_params[((s - 1L) * beta_dim + (col - 1L) * p + 1L):((s - 1L) * beta_dim + col * p)]
+          else rep(0, p)
+        })
+        ref_vec <- old_betas[[ref_col]]
+        unlist(lapply(seq_len(N - 1L), function(j)
+          old_betas[[sorted_states[j]]] - ref_vec))
       }))
+    }
+    optim_params <- c(
+      beta_reordered,
+      unlist(lapply(sorted_states, function(s)
+        optim_params[rho_indices][((s - 1L) * C_per_state + 1L):(s * C_per_state)]))
     )
   }
 
   # Parameter extraction
-  beta <- matrix(optim_params[1:n_beta], nrow = N, ncol = p)
+  beta <- matrix(optim_params[1:n_beta], nrow = N, byrow = TRUE)
   rho_matrix <- matrix(optim_params[rho_indices], nrow = N, byrow = TRUE)
 
   # Covariance matrix reconstruction
@@ -158,27 +185,40 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     sigma_array[,,i] <- cor_mat
   }
 
-  # Generalized transition matrix
-  avg_X <- colMeans(X)
+  # Transition matrix evaluated at the in-sample covariate means. X_optim is the
+  # estimation window (X_is when out_of_sample = TRUE, full X otherwise), so this
+  # summary does not leak held-out OOS covariates that beta was never fit on.
+  avg_X <- colMeans(X_optim)
   P <- matrix(nrow = N, ncol = N)
-  for (i in 1:N) {
-    for (j in 1:N) {
-      if(i == j) {
-        P[i,j] <- plogis(avg_X %*% beta[i, ])
-      } else {
-        P[i,j] <- (1 - plogis(avg_X %*% beta[i, ])) / (N - 1)
-      }
+  if (N == 2) {
+    for (i in 1:N) {
+      p_ii <- plogis(avg_X %*% beta[i, ])
+      P[i, i] <- p_ii
+      P[i, -i] <- (1 - p_ii) / (N - 1)
+    }
+  } else {
+    # N=3: softmax
+    for (i in 1:N) {
+      logits <- c(sapply(seq_len(N - 1L), function(j)
+        sum(avg_X * beta[i, ((j - 1L) * p + 1L):(j * p)])), 0)
+      exp_l <- exp(logits - max(logits))
+      P[i, ] <- exp_l / sum(exp_l)
     }
   }
 
+  ll_oos <- if (out_of_sample)
+    -rsdc_likelihood(optim_params, y = residuals_oos, exog = X_oos, K = K, N = N)
+  else NULL
+
   list(
-    transition_matrix = P,
-    means = matrix(0, N, K),
-    volatilities = matrix(1, N, K),
-    correlations = rho_matrix,
-    covariances = sigma_array,
-    log_likelihood = -result_optim$value,
-    beta = beta
+    transition_matrix  = P,
+    means              = matrix(0, N, K),
+    volatilities       = matrix(1, N, K),
+    correlations       = rho_matrix,
+    covariances        = sigma_array,
+    log_likelihood     = -result_optim$value,
+    log_likelihood_oos = ll_oos,
+    beta               = beta
   )
 }
 
@@ -206,20 +246,23 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #'   \item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations,
 #'     with \eqn{C = K(K-1)/2}.}
 #'   \item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
-#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
-#'   \item{beta}{\code{NULL} (no covariates in this specification).}
-#' }
-#'
-#' @details
-#' \itemize{
-#'   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
-#'         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
-#'   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
-#'     for numerical stability and identifiability.
-#'   \item \strong{Correlation build:} Each regime’s correlation matrix is reconstructed from
-#'     its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
-#'     likelihood routine.
-#' }
+#’   \item{log_likelihood}{In-sample log-likelihood (numeric scalar); full-sample when \code{out_of_sample = FALSE}.}
+#’   \item{log_likelihood_oos}{OOS log-likelihood evaluated on the held-out 30\% (numeric scalar),
+#’     or \code{NULL} when \code{out_of_sample = FALSE}.}
+#’   \item{beta}{\code{NULL} (no covariates in this specification).}
+#’ }
+#’
+#’ @details
+#’ \itemize{
+#’   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
+#’         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
+#’   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
+#’     for numerical stability and identifiability.
+#’   \item \strong{Correlation build:} Each regime’s correlation matrix is reconstructed from
+#’     its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
+#’     likelihood routine.
+#’   \item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
+#’ }
 #'
 #' @section Assumptions:
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
@@ -237,27 +280,35 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' @importFrom stats optim
 #' @noRd
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
+  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
   stopifnot(is.matrix(residuals))
 
   con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
-  T <- nrow(residuals)
+  n_obs <- nrow(residuals)
   n_trans <- N * (N - 1)
   C_per_state <- K * (K - 1) / 2
   n_rho <- N * C_per_state
 
+  # Each free transition prob in [0.01, 0.99] for all N. For N=3 the implied third
+  # prob (1 - p_i1 - p_i2) can be negative for some proposals; rsdc_likelihood rejects
+  # those rows (returns 1e10). This keeps persistent diagonals (p_ii up to 0.99)
+  # reachable instead of capping them at 0.485.
+  trans_upper <- 0.99
   bounds <- list(
     lower = c(rep(0.01, n_trans), rep(-1, n_rho)),
-    upper = c(rep(0.99, n_trans), rep(1, n_rho))
+    upper = c(rep(trans_upper, n_trans), rep(1, n_rho))
   )
 
   if (out_of_sample) {
-    cut <- round(0.7 * T)
-    y_optim <- residuals[1:cut, ]
+    cut     <- round(0.7 * n_obs)
+    y_optim <- residuals[1:cut, , drop = FALSE]
+    y_oos   <- residuals[(cut + 1):n_obs, , drop = FALSE]
   } else {
     y_optim <- residuals
+    y_oos   <- NULL
   }
 
   set.seed(con$seed)
@@ -282,6 +333,32 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   )
 
   final_par <- optim_result$par
+
+  # Regime reordering for identifiability (ascending mean correlation)
+  trans_per_regime <- N - 1L
+  rho_params <- final_par[(n_trans + 1):(n_trans + n_rho)]
+  corr_means <- sapply(1:N, function(i) mean(rho_params[(1:C_per_state) + (i - 1L) * C_per_state]))
+  sorted_states <- order(corr_means)
+  if (!all(sorted_states == 1:N)) {
+    orig_trans <- final_par[1:n_trans]
+    if (N == 2L) {
+      trans_reordered <- unlist(lapply(sorted_states, function(s)
+        orig_trans[((s - 1L) * trans_per_regime + 1L):(s * trans_per_regime)]))
+    } else {
+      # N=3: reconstruct full P row, then select columns in new state order
+      trans_reordered <- unlist(lapply(sorted_states, function(s) {
+        free     <- orig_trans[((s - 1L) * trans_per_regime + 1L):(s * trans_per_regime)]
+        full_row <- c(free, 1 - sum(free))
+        full_row[sorted_states][seq_len(N - 1L)]
+      }))
+    }
+    final_par <- c(
+      trans_reordered,
+      unlist(lapply(sorted_states, function(s)
+        rho_params[((s - 1L) * C_per_state + 1L):(s * C_per_state)]))
+    )
+  }
+
   rho_matrix <- matrix(final_par[(n_trans + 1):(n_trans + n_rho)], nrow = N, byrow = TRUE)
 
   sigma_array <- array(dim = c(K, K, N))
@@ -300,16 +377,27 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     P[1, 2] <- 1 - trans_params[1]
     P[2, 1] <- 1 - trans_params[2]
     P[2, 2] <- trans_params[2]
+  } else if (N == 3) {
+    for (i in 1:N) {
+      p_i1 <- trans_params[2L * (i - 1L) + 1L]
+      p_i2 <- trans_params[2L * (i - 1L) + 2L]
+      P[i, ] <- c(p_i1, p_i2, 1 - p_i1 - p_i2)
+    }
   }
 
+  ll_oos <- if (!is.null(y_oos))
+    -rsdc_likelihood(final_par, y = y_oos, exog = NULL, K = K, N = N)
+  else NULL
+
   list(
-    transition_matrix = P,
-    means = matrix(0, N, K),
-    volatilities = matrix(1, N, K),
-    correlations = rho_matrix,
-    covariances = sigma_array,
-    log_likelihood = -optim_result$value,
-    beta = NULL
+    transition_matrix  = P,
+    means              = matrix(0, N, K),
+    volatilities       = matrix(1, N, K),
+    correlations       = rho_matrix,
+    covariances        = sigma_array,
+    log_likelihood     = -optim_result$value,
+    log_likelihood_oos = ll_oos,
+    beta               = NULL
   )
 }
 
@@ -336,7 +424,9 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 #'   \item{correlations}{\eqn{1 \times C} vector of lower-triangular correlations,
 #'     where \eqn{C = K(K-1)/2}.}
 #'   \item{covariances}{Array \eqn{K \times K \times 1} with the full correlation matrix.}
-#'   \item{log_likelihood}{Maximized log-likelihood (numeric scalar).}
+#'   \item{log_likelihood}{In-sample log-likelihood (numeric scalar); full-sample when \code{out_of_sample = FALSE}.}
+#'   \item{log_likelihood_oos}{OOS log-likelihood evaluated on the held-out 30\% (numeric scalar),
+#'     or \code{NULL} when \code{out_of_sample = FALSE}.}
 #'   \item{beta}{\code{NULL} (no covariates).}
 #' }
 #'
@@ -382,8 +472,9 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     eig <- tryCatch(eigen(R, only.values = TRUE)$values, error = function(e) NA_real_)
     if (any(!is.finite(eig)) || min(eig) < 1e-8) return(1e10)
 
-    inv_R  <- solve(R + diag(1e-8, K))
-    logdet <- determinant(R, logarithm = TRUE)$modulus[1]
+    R_rdg  <- R + diag(1e-8, K)            # ridge used consistently for inverse and log-det
+    inv_R  <- solve(R_rdg)
+    logdet <- determinant(R_rdg, logarithm = TRUE)$modulus[1]
     quad   <- rowSums((y %*% inv_R) * y)
     # negative log-likelihood
     return(-(-0.5 * sum(logdet + quad + K * log(2 * pi))))
@@ -425,21 +516,23 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   R[upper.tri(R)] <- t(R)[upper.tri(R)]
   array_R <- array(R, dim = c(K, K, 1))
 
-  # Single returned likelihood depending on the flag
-  ll_return <- if (out_of_sample) {
-    -neg_loglik_const(rho_vec, y_is, K)  # OOS ll
-  } else {
-    -optim_result$value                   # IS ll
-  }
+  # IS log-likelihood (full-sample when out_of_sample = FALSE)
+  ll_return <- -optim_result$value
+
+  # OOS log-likelihood: evaluate IS-fitted params on held-out data
+  ll_oos <- if (!is.null(y_oos))
+    -neg_loglik_const(rho_vec, y = y_oos, K = K)
+  else NULL
 
   list(
-    transition_matrix = matrix(1, 1, 1),
-    means        = matrix(0, 1, K),
-    volatilities = matrix(1, 1, K),
-    correlations = matrix(rho_vec, nrow = 1),
-    covariances  = array_R,
-    log_likelihood = ll_return,
-    beta = NULL
+    transition_matrix  = matrix(1, 1, 1),
+    means              = matrix(0, 1, K),
+    volatilities       = matrix(1, 1, K),
+    correlations       = matrix(rho_vec, nrow = 1),
+    covariances        = array_R,
+    log_likelihood     = ll_return,
+    log_likelihood_oos = ll_oos,
+    beta               = NULL
   )
 }
 
@@ -464,7 +557,8 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'   \item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"}).}
 #'   \item{\code{correlations}}{Regime lower-triangular correlations.}
 #'   \item{\code{covariances}}{Array of full correlation matrices.}
-#'   \item{\code{log_likelihood}}{Maximized log-likelihood.}
+#'   \item{\code{log_likelihood}}{In-sample log-likelihood; full-sample when \code{out_of_sample = FALSE}.}
+#'   \item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30%, or \code{NULL} when \code{out_of_sample = FALSE}.}
 #'   \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}).}
 #' }
 #'
@@ -472,7 +566,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' \itemize{
 #'   \item \strong{Method selection:} \code{match.arg()} validates \code{method}.
 #'   \item \strong{Inputs:} \code{"tvtp"} requires non-NULL \code{X}; \code{N} is ignored for \code{"const"}.
-#'   \item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70\% is used for fitting.
+#'   \item \strong{Split:} If \code{out_of_sample = TRUE}, the first 70% is used for fitting.
 #' }
 #'
 #' @references
@@ -498,6 +592,16 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           residuals, N = 2, X = NULL,
                           out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
+  if (!is.null(N) && N < 2) stop("N must be at least 2. Use method='const' for a single-regime model.")
+
+  # Correlation-only model: columns are assumed mean-zero, unit-variance. Warn (do not
+  # auto-transform) when inputs deviate materially so raw returns are not silently misspecified.
+  if (is.matrix(residuals)) {
+    col_sd <- apply(residuals, 2, stats::sd)
+    if (any(is.finite(col_sd) & (col_sd < 0.5 | col_sd > 2)))
+      warning("residuals columns are not ~unit-variance (sd outside [0.5, 2]); the model treats ",
+              "inputs as standardized. Consider scale() so only the correlation structure is fit.")
+  }
 
   con <- list(seed = 123, do_trace = FALSE)
   con[names(control)] <- control
