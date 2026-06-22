@@ -1,4 +1,4 @@
-# Changes in Version 1.2-0 (BS,DA)
+# Changes in Version 1.2-0 (BS,DA,RN)
 - Added `mccc` dataset: daily Media Climate Change Concerns (Aggregate) index,
   forward-filled from monthly and aligned row-for-row to `greenbrown`. Supplies
   the exogenous TVTP covariate used in the vignette, so the empirical workflow

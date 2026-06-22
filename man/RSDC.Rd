@@ -36,7 +36,7 @@ reconstruction and portfolio optimization — in a single, reproducible pipeline
 
 \section{Authors}{
 
-David Ardia and Benjamin Seguin
+David Ardia, Benjamin Seguin and Roosevelt Ymele NGUEMO
 }
 
 \references{

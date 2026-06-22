@@ -31,7 +31,7 @@
 #' }
 #'
 #' @section Authors:
-#' David Ardia and Benjamin Seguin
+#' David Ardia, Benjamin Seguin and Roosevelt Ymele NGUEMO
 #'
 #' @references
 #' \insertRef{engle2002dynamic}{RSDC} \cr
