@@ -21,6 +21,10 @@
 # Source from the package root in RStudio:
 #   source("inst/simulation/monte_carlo_study.R")
 # =============================================================================
+# Prerequisites (not declared in DESCRIPTION; this script is not part of R CMD
+# check): rprojroot, devtools (for load_all), and optionally RhpcBLASctl. Base
+# 'parallel' ships with R. Install any missing ones before sourcing.
+# =============================================================================
 # Resolve the package root (the folder containing DESCRIPTION) without hardcoding a
 # machine-specific path. rprojroot ships with devtools, so no extra dependency is
 # needed; if the root cannot be found we fall back to the current directory.
@@ -45,8 +49,12 @@ K_grid   <- c(2L, 3L, 4L)            # cross-section sizes swept in the N=3 case
 # (set.seed(base_seed + m)), so results are bit-identical regardless of the worker
 # count or scheduling order — only the wall-clock time changes.
 #
-# Workers: fixed at 14 (On the 18-core target machine).
-MC_CORES <- 14L
+# Workers: portable default (leave 2 cores free). Override via the MC_CORES env
+# var or by editing this line. On Windows mclapply runs serially regardless.
+MC_CORES <- {
+  env <- suppressWarnings(as.integer(Sys.getenv("MC_CORES", "")))
+  if (!is.na(env) && env >= 1L) env else max(1L, parallel::detectCores() - 2L)
+}
 # Pin BLAS to a single thread so matrix ops inside the forked workers don't spawn
 # their own thread pools on top of the M-way fork (no-op if RhpcBLASctl is absent).
 if (requireNamespace("RhpcBLASctl", quietly = TRUE)) RhpcBLASctl::blas_set_num_threads(1L)

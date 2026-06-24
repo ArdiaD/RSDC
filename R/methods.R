@@ -274,7 +274,14 @@ simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL,
   n_ <- if (!is.null(n)) as.integer(n) else if (!is.null(object$nobs)) object$nobs else 500L
   P <- object$transition_matrix
   states <- integer(n_); obs <- matrix(NA_real_, n_, K)
-  states[1] <- if (object$method == "noX") sample.int(N, 1) else 1L
+  # Draw the initial noX state from the chain's ergodic distribution (uniform fallback).
+  if (object$method == "noX") {
+    pi0 <- .rsdc_ergodic(P)
+    if (any(!is.finite(pi0))) pi0 <- rep(1 / N, N)
+    states[1] <- sample.int(N, 1, prob = pi0)
+  } else {
+    states[1] <- 1L
+  }
   obs[1, ] <- mvtnorm::rmvnorm(1, mu[states[1], ], sigma[, , states[1]])
   if (n_ > 1L) for (t in 2:n_) {
     states[t] <- if (object$method == "noX") sample.int(N, 1, prob = P[states[t - 1L], ]) else 1L
