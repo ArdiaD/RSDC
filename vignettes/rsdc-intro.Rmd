@@ -92,6 +92,20 @@ sim2 <- simulate(fit, X = X, seed = 7)
 table(sim2$states)
 ```
 
+## Genuine out-of-sample forecasts
+
+For a look-ahead-free forecast, set `out_of_sample = TRUE`: the filter is run on the
+first 70% of the sample, its terminal state initialises the held-out run, and the
+out-of-sample correlations are weighted by **filtered** (not smoothed) probabilities
+so no future information leaks in.
+
+```{r oos}
+fc_oos <- predict(fit, residuals = y, sigma_matrix = sigma_mat,
+                  value_cols = c("a", "b"), X = X, out_of_sample = TRUE)
+nrow(fc_oos$predicted_correlations)   # length of the 30% hold-out
+fc_oos$BIC                            # out-of-sample predictive score
+```
+
 ## More than three regimes
 
 `N >= 4` is supported for `"noX"` and `"tvtp"`:
@@ -101,3 +115,19 @@ fit4 <- rsdc_estimate("noX", residuals = y, N = 4,
                       control = list(itermax = 20, NP = 60, seed = 1))
 dim(fit4$transition_matrix)
 ```
+
+## Validation: parameter recovery
+
+Because the data above were simulated with known regime correlations
+(`rho = c(0.2, 0.8)`), we can check that the estimator recovers them — the fitted
+`tvtp(N = 2)` correlations should be close to the truth:
+
+```{r recovery}
+rbind(true = c(0.2, 0.8),
+      estimated = sort(as.numeric(fit$correlations)))
+```
+
+A full Monte-Carlo study (five model variants, $M = 100$ replications,
+$T \in \{500, 1000, 2000\}$, $K \in \{2, 3, 4\}$, reporting bias/RMSE/MCSE) ships with
+the package in `inst/simulation/monte_carlo_study.R` and can be run from the package
+root with `source(system.file("simulation", "monte_carlo_study.R", package = "RSDC"))`.
