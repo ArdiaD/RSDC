@@ -30,6 +30,76 @@ static mat tvtp_P(const rowvec& xt, const mat& beta, int N, int p) {
   return P;
 }
 
+// Full Hamilton filter + smoother. Returns filtered/smoothed probabilities, the
+// log-likelihood and the per-observation contributions. Mirrors the pure-R
+// rsdc_hamilton() engine = "r" path exactly (same ridge, PD check, log-sum-exp,
+// smoothing recursion). On a non-PD regime or a degenerate step it returns
+// ok = FALSE / log_likelihood = -Inf, which the R wrapper maps to NULL outputs.
+// [[Rcpp::export]]
+Rcpp::List rsdc_filter_full_cpp(const arma::mat& y, const arma::cube& sigma,
+                                int mode, const arma::mat& P0,
+                                const arma::mat& X, const arma::mat& beta,
+                                const arma::vec& xi_init) {
+  const int T = y.n_rows, K = y.n_cols, N = sigma.n_slices;
+  const double eps = std::numeric_limits<double>::epsilon();   // .Machine$double.eps
+  Rcpp::List fail = Rcpp::List::create(Rcpp::Named("ok") = false,
+                                       Rcpp::Named("log_likelihood") = -arma::datum::inf);
+
+  arma::mat logdens(N, T);
+  const double cst = K * std::log(2.0 * M_PI);
+  for (int m = 0; m < N; ++m) {
+    arma::mat Rm = sigma.slice(m);
+    arma::vec ev;
+    if (!eig_sym(ev, Rm) || ev.min() < 1e-8) return fail;
+    arma::mat Rr = Rm + 1e-8 * eye(K, K);
+    arma::mat invR;
+    if (!inv(invR, Rr)) return fail;
+    double ld, sgn; log_det(ld, sgn, Rr);
+    arma::vec quad = sum((y * invR) % y, 1);
+    logdens.row(m) = (-0.5 * (ld + quad + cst)).t();
+  }
+
+  const int p = (mode == 1) ? (int) X.n_cols : 0;
+  arma::mat filtered(N, T), predicted(N, T), smoothed(N, T);
+  arma::vec loglik_t(T);
+  arma::vec xi = (xi_init.n_elem == (arma::uword) N) ? xi_init / accu(xi_init)
+                                                     : arma::vec(N).fill(1.0 / N);
+  double loglik = 0.0;
+  for (int t = 0; t < T; ++t) {
+    arma::mat Pt = (mode == 0) ? P0 : tvtp_P(X.row(t), beta, N, p);
+    arma::vec pred = Pt.t() * xi;
+    predicted.col(t) = pred;
+    arma::vec ld = logdens.col(t);
+    double c = ld.max();
+    arma::vec w = pred % exp(ld - c);
+    double sw = accu(w);
+    if (!std::isfinite(sw) || sw <= 0.0) return fail;
+    filtered.col(t) = w / sw;
+    loglik_t(t) = std::log(sw) + c;
+    loglik += loglik_t(t);
+    xi = filtered.col(t);
+  }
+
+  smoothed.col(T - 1) = filtered.col(T - 1);
+  for (int t = T - 2; t >= 0; --t) {
+    arma::mat Pt1 = (mode == 0) ? P0 : tvtp_P(X.row(t + 1), beta, N, p);
+    arma::vec denom = predicted.col(t + 1);
+    denom.transform([eps](double v) { return v < eps ? eps : v; });
+    arma::vec ratio = smoothed.col(t + 1) / denom;
+    arma::vec temp = filtered.col(t) % (Pt1 * ratio);
+    double s = accu(temp);
+    if (!std::isfinite(s) || s < eps) return fail;
+    smoothed.col(t) = temp / s;
+  }
+
+  return Rcpp::List::create(
+    Rcpp::Named("filtered_probs") = filtered,
+    Rcpp::Named("smoothed_probs") = smoothed,
+    Rcpp::Named("log_likelihood") = loglik,
+    Rcpp::Named("loglik_t")       = loglik_t,
+    Rcpp::Named("ok")             = true);
+}
+
 // [[Rcpp::export]]
 double rsdc_loglik_cpp(const arma::mat& y,        // T x K observations
                        const arma::cube& sigma,    // K x K x N regime correlation matrices

@@ -11,6 +11,23 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// rsdc_filter_full_cpp
+Rcpp::List rsdc_filter_full_cpp(const arma::mat& y, const arma::cube& sigma, int mode, const arma::mat& P0, const arma::mat& X, const arma::mat& beta, const arma::vec& xi_init);
+RcppExport SEXP _RSDC_rsdc_filter_full_cpp(SEXP ySEXP, SEXP sigmaSEXP, SEXP modeSEXP, SEXP P0SEXP, SEXP XSEXP, SEXP betaSEXP, SEXP xi_initSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< int >::type mode(modeSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type P0(P0SEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type xi_init(xi_initSEXP);
+    rcpp_result_gen = Rcpp::wrap(rsdc_filter_full_cpp(y, sigma, mode, P0, X, beta, xi_init));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rsdc_loglik_cpp
 double rsdc_loglik_cpp(const arma::mat& y, const arma::cube& sigma, int mode, const arma::mat& P0, const arma::mat& X, const arma::mat& beta, const arma::vec& xi_init);
 RcppExport SEXP _RSDC_rsdc_loglik_cpp(SEXP ySEXP, SEXP sigmaSEXP, SEXP modeSEXP, SEXP P0SEXP, SEXP XSEXP, SEXP betaSEXP, SEXP xi_initSEXP) {
@@ -30,6 +47,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_RSDC_rsdc_filter_full_cpp", (DL_FUNC) &_RSDC_rsdc_filter_full_cpp, 7},
     {"_RSDC_rsdc_loglik_cpp", (DL_FUNC) &_RSDC_rsdc_loglik_cpp, 7},
     {NULL, NULL, 0}
 };

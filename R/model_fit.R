@@ -27,6 +27,9 @@
 #'   out-of-sample forecasting: run the filter on the in-sample period first,
 #'   extract the terminal column of \code{filtered_probs}, and pass it here to
 #'   initialise the out-of-sample filter run. Must be non-negative and finite.
+#' @param engine Character; \code{"cpp"} (default) runs the filter/smoother in C++
+#'   (\pkg{RcppArmadillo}), \code{"r"} the pure-R reference. Both give identical
+#'   results (used for equivalence testing).
 #'
 #' @returns A list with:
 #' \describe{
@@ -94,7 +97,8 @@
 #' @importFrom stats plogis
 #' @export
 rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
-                          xi_init = NULL) {
+                          xi_init = NULL, engine = c("cpp", "r")) {
+  engine <- match.arg(engine)
 
   if (!is.matrix(y)) stop("y must be a numeric matrix.")
   if (any(!is.finite(y))) stop("y must not contain NA/NaN/Inf values.")
@@ -124,6 +128,33 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
 
   n_obs <- nrow(y)
   if (K != ncol(y)) stop(sprintf("K = %d but ncol(y) = %d.", K, ncol(y)))
+
+  # Fast path: run the full filter + smoother in C++ (engine = "cpp", default).
+  # The pure-R engine below is kept as the reference and for equivalence testing.
+  if (engine == "cpp") {
+    sig <- array(0, dim = c(K, K, N))
+    for (m in 1:N) {
+      Rm <- diag(K)
+      Rm[lower.tri(Rm)] <- rho_matrix[m, ]
+      Rm[upper.tri(Rm)] <- t(Rm)[upper.tri(Rm)]
+      sig[, , m] <- Rm
+    }
+    tvtp  <- !is.null(X) && !is.null(beta)
+    empty <- matrix(0, 0, 0)
+    P0    <- if (tvtp) empty else if (!is.null(P)) P else matrix(1 / N, N, N)
+    res <- rsdc_filter_full_cpp(
+      as.matrix(y), sig, if (tvtp) 1L else 0L, P0,
+      if (tvtp) as.matrix(X) else empty,
+      if (tvtp) as.matrix(beta) else empty,
+      if (is.null(xi_init)) numeric(0) else xi_init)
+    if (!isTRUE(res$ok) || !is.finite(res$log_likelihood))
+      return(list(filtered_probs = NULL, smoothed_probs = NULL,
+                  log_likelihood = -Inf, loglik_t = NULL))
+    return(list(filtered_probs = res$filtered_probs,
+                smoothed_probs = res$smoothed_probs,
+                log_likelihood = res$log_likelihood,
+                loglik_t       = as.numeric(res$loglik_t)))
+  }
 
   # Build regime correlation matrices
   sigma <- array(dim = c(K, K, N))

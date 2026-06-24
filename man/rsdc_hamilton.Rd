@@ -12,7 +12,8 @@ rsdc_hamilton(
   K,
   N,
   P = NULL,
-  xi_init = NULL
+  xi_init = NULL,
+  engine = c("cpp", "r")
 )
 }
 \arguments{
@@ -44,6 +45,10 @@ to 1) instead of the default uniform \eqn{1/N}. Intended for two-pass
 out-of-sample forecasting: run the filter on the in-sample period first,
 extract the terminal column of \code{filtered_probs}, and pass it here to
 initialise the out-of-sample filter run. Must be non-negative and finite.}
+
+\item{engine}{Character; \code{"cpp"} (default) runs the filter/smoother in C++
+(\pkg{RcppArmadillo}), \code{"r"} the pure-R reference. Both give identical
+results (used for equivalence testing).}
 }
 \value{
 A list with:

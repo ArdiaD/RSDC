@@ -1,6 +1,35 @@
 # The C++ log-likelihood used by rsdc_likelihood() must reproduce the pure-R
 # Hamilton filter rsdc_hamilton() to numerical precision (added in 1.4-0).
 
+test_that("rsdc_hamilton C++ engine matches the R engine (filtered/smoothed/loglik)", {
+  set.seed(7)
+  T <- 120; K <- 3
+  y <- scale(matrix(rnorm(T * K), T, K))
+  X <- cbind(1, as.numeric(scale(seq_len(T))))
+
+  cmp <- function(N, mode) {
+    rho <- matrix(seq(0.1, 0.7, length.out = N * K * (K - 1) / 2), nrow = N, byrow = TRUE)
+    if (mode == "fixedP") {
+      free <- 0.8 / (N - 1)
+      P <- matrix(free, N, N); diag(P) <- 0.2 + 0.8 - free * (N - 1)
+      P <- P / rowSums(P)
+      a <- rsdc_hamilton(y, NULL, NULL, rho, K, N, P, engine = "r")
+      b <- rsdc_hamilton(y, NULL, NULL, rho, K, N, P, engine = "cpp")
+    } else if (mode == "uniform") {
+      a <- rsdc_hamilton(y, NULL, NULL, rho, K, N, engine = "r")
+      b <- rsdc_hamilton(y, NULL, NULL, rho, K, N, engine = "cpp")
+    } else {
+      beta <- matrix(rnorm(N * (if (N == 2) ncol(X) else (N - 1) * ncol(X)), sd = 0.2), nrow = N)
+      a <- rsdc_hamilton(y, X, beta, rho, K, N, engine = "r")
+      b <- rsdc_hamilton(y, X, beta, rho, K, N, engine = "cpp")
+    }
+    expect_equal(a$log_likelihood, b$log_likelihood, tolerance = 1e-8)
+    expect_equal(a$filtered_probs, b$filtered_probs, tolerance = 1e-8)
+    expect_equal(a$smoothed_probs, b$smoothed_probs, tolerance = 1e-8)
+  }
+  cmp(2, "fixedP"); cmp(3, "fixedP"); cmp(2, "uniform"); cmp(2, "tvtp"); cmp(3, "tvtp")
+})
+
 test_that("C++ log-likelihood matches the R Hamilton filter (noX and tvtp)", {
   set.seed(1)
   T <- 120; K <- 3; N <- 2
