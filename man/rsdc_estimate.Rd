@@ -93,7 +93,7 @@ for \code{"tvtp"}, evaluated at the in-sample covariate means).}
 \item{\code{correlations}}{Regime lower-triangular correlations (rows ordered by ascending mean).}
 \item{\code{covariances}}{Array \eqn{K \times K \times N} of regime correlation matrices.}
 \item{\code{log_likelihood}}{In-sample log-likelihood; full-sample when \code{out_of_sample = FALSE}.}
-\item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30\\%, or \code{NULL}.}
+\item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30 percent, or \code{NULL}.}
 \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}; \code{NULL} otherwise).}
 \item{\code{par}, \code{coefficients}}{Named vector of estimated parameters in objective order.}
 \item{\code{vcov}}{Observed-information variance-covariance at the MLE, or \code{NULL} if
