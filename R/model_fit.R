@@ -97,7 +97,13 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
                           xi_init = NULL) {
 
   if (!is.matrix(y)) stop("y must be a numeric matrix.")
+  if (any(!is.finite(y))) stop("y must not contain NA/NaN/Inf values.")
   if (!is.null(X) && !is.matrix(X)) stop("X must be a numeric matrix or NULL.")
+  if (!is.null(X) && any(!is.finite(X))) stop("X must not contain NA/NaN/Inf values.")
+  # TVTP needs both X and beta; supplying only one silently fell back to a fixed P.
+  if (xor(is.null(X), is.null(beta)))
+    stop("For time-varying transitions supply both X and beta; supply neither for a ",
+         "fixed transition matrix.")
   if (!is.null(beta) && (!is.matrix(beta) || nrow(beta) != N)) stop("beta must be a matrix with N rows.")
   if (!is.null(beta) && !is.null(X)) {
     expected_ncol <- if (N == 2L) ncol(X) else (N - 1L) * ncol(X)
@@ -111,8 +117,9 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
   if (!is.null(P) && (!is.matrix(P) || !all(dim(P) == c(N, N)))) {
     stop("P must be an N x N matrix if provided.")
   }
-  if (!is.null(xi_init) && (length(xi_init) != N || any(!is.finite(xi_init)) || any(xi_init < 0))) {
-    stop("xi_init must be a non-negative finite vector of length N.")
+  if (!is.null(xi_init) && (length(xi_init) != N || any(!is.finite(xi_init)) ||
+                            any(xi_init < 0) || sum(xi_init) <= 0)) {
+    stop("xi_init must be a finite, non-negative vector of length N with a positive sum.")
   }
 
   n_obs <- nrow(y)
@@ -336,6 +343,9 @@ rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
   n_beta <- if (!is.null(exog)) {
     if (N == 2) N * ncol(exog) else N * (N - 1L) * ncol(exog)
   } else 0
+
+  # Reject a wrong-length parameter vector (avoids NA from out-of-range slicing).
+  if (length(params) != (if (is.null(exog)) n_p else n_beta) + n_rho) return(1e10)
 
   # Parameter extraction
   if (is.null(exog)) {

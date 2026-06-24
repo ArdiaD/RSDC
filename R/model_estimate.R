@@ -92,6 +92,8 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   # Out-of-sample handling (fixed indexing)
   if (out_of_sample) {
     is_cut        <- round(0.7 * nrow(residuals))
+    if (is_cut < 2L || nrow(residuals) - is_cut < 1L)
+      stop("Sample too small for a 70/30 out-of-sample split.")
     residuals_is  <- residuals[1:is_cut, , drop = FALSE]
     residuals_oos <- residuals[(is_cut + 1):nrow(residuals), , drop = FALSE]
     X_is  <- X[1:is_cut, , drop = FALSE]
@@ -273,23 +275,23 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #'   \item{correlations}{\eqn{N \times C} matrix of lower-triangular correlations,
 #'     with \eqn{C = K(K-1)/2}.}
 #'   \item{covariances}{Array \eqn{K \times K \times N} of regime correlation matrices.}
-#’   \item{log_likelihood}{In-sample log-likelihood (numeric scalar); full-sample when \code{out_of_sample = FALSE}.}
-#’   \item{log_likelihood_oos}{OOS log-likelihood evaluated on the held-out 30\% (numeric scalar),
-#’     or \code{NULL} when \code{out_of_sample = FALSE}.}
-#’   \item{beta}{\code{NULL} (no covariates in this specification).}
-#’ }
-#’
-#’ @details
-#’ \itemize{
-#’   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
-#’         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
-#’   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
-#’     for numerical stability and identifiability.
-#’   \item \strong{Correlation build:} Each regime’s correlation matrix is reconstructed from
-#’     its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
-#’     likelihood routine.
-#’   \item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
-#’ }
+#'   \item{log_likelihood}{In-sample log-likelihood (numeric scalar); full-sample when \code{out_of_sample = FALSE}.}
+#'   \item{log_likelihood_oos}{OOS log-likelihood evaluated on the held-out 30\% (numeric scalar),
+#'     or \code{NULL} when \code{out_of_sample = FALSE}.}
+#'   \item{beta}{\code{NULL} (no covariates in this specification).}
+#' }
+#'
+#' @details
+#' \itemize{
+#'   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
+#'         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
+#'   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
+#'     for numerical stability and identifiability.
+#'   \item \strong{Correlation build:} Each regime's correlation matrix is reconstructed from
+#'     its lower-triangular vector and symmetrized; non-PD proposals are penalized in the
+#'     likelihood routine.
+#'   \item \strong{State ordering:} regimes are reordered by ascending mean correlation for identifiability.
+#' }
 #'
 #' @section Assumptions:
 #' Inputs in \code{residuals} are treated as mean-zero with unit variance; only the correlation
@@ -333,6 +335,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 
   if (out_of_sample) {
     cut     <- round(0.7 * n_obs)
+    if (cut < 2L || n_obs - cut < 1L)
+      stop("Sample too small for a 70/30 out-of-sample split.")
     y_optim <- residuals[1:cut, , drop = FALSE]
     y_oos   <- residuals[(cut + 1):n_obs, , drop = FALSE]
   } else {
@@ -436,10 +440,16 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
       P[i, ] <- row
     }
   }
-  if (infeasible_row)
+  if (infeasible_row) {
+    # Re-write the transition block of the parameter vector from the projected
+    # (valid) matrix so that par, log-likelihood, vcov and the OOS likelihood
+    # below are all consistent with the returned transition_matrix.
+    final_par[1:n_trans] <- as.vector(t(P[, seq_len(N - 1L), drop = FALSE]))
+    optim_result$value <- rsdc_likelihood(final_par, y = y_optim, exog = NULL, K = K, N = N)
     warning("Transition matrix had an infeasible row (free probabilities summed > 1) ",
             "and was projected onto the simplex; the optimiser may not have converged. ",
             "Increase control$itermax or control$NP.")
+  }
 
   # Warn when a free transition probability is pinned to its [0.01, 0.99] bound
   # (degenerate / near-absorbing regime; SEs there are unreliable).
@@ -557,6 +567,8 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   # Split (if requested)
   if (out_of_sample) {
     cut <- round(0.7 * nrow(residuals))
+    if (cut < 2L || nrow(residuals) - cut < 1L)
+      stop("Sample too small for a 70/30 out-of-sample split.")
     y_is  <- residuals[1:cut, , drop = FALSE]
     y_oos <- residuals[(cut + 1):nrow(residuals), , drop = FALSE]
   } else {
@@ -703,6 +715,11 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
   if (!is.null(N) && N < 2) stop("N must be at least 2. Use method='const' for a single-regime model.")
+
+  if (!is.matrix(residuals)) stop("residuals must be a numeric matrix.")
+  if (any(!is.finite(residuals))) stop("residuals must not contain NA/NaN/Inf values.")
+  if (!is.null(X) && any(!is.finite(as.matrix(X))))
+    stop("X must not contain NA/NaN/Inf values.")
 
   # Correlation-only model: columns are assumed mean-zero, unit-variance. Warn (do not
   # auto-transform) when inputs deviate materially so raw returns are not silently misspecified.

@@ -7,8 +7,8 @@
 #'
 #' @param n Integer. Number of time steps to simulate; must be at least 2.
 #' @param X Numeric matrix \eqn{n \times p} of covariates used to form the transition
-#'   probabilities. Row \code{X[t, ]} is used at time \eqn{t \ge 2} to form \eqn{P_t};
-#'   row 1 is not used (no transition out of the initial state).
+#'   probabilities. Row \code{X[1, ]} forms \eqn{P_1}, used only to draw the initial
+#'   state from \eqn{t(P_1)\,\pi_0}; rows \code{X[t, ]} for \eqn{t \ge 2} form \eqn{P_t}.
 #' @param beta Numeric matrix \eqn{N \times (N-1) \cdot p}. Transition coefficients
 #'   packed row-wise by regime, matching the parameterisation of
 #'   \code{\link{rsdc_hamilton}} and \code{\link{rsdc_estimate}}. For \eqn{N=2},

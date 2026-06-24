@@ -23,6 +23,32 @@ test_that("C++ log-likelihood matches the R Hamilton filter (noX and tvtp)", {
   expect_equal(ll_cpp2, ll_R2, tolerance = 1e-8)
 })
 
+test_that("C++ log-likelihood matches the R filter for N = 4 (noX and tvtp)", {
+  set.seed(3)
+  T <- 200; K <- 2; N <- 4
+  y <- scale(matrix(rnorm(T * K), T, K))
+  rho <- rbind(0.05, 0.35, 0.6, 0.85)                # N x C, C = 1
+
+  # noX: each row a valid simplex; free = first N-1 = 3 entries
+  Prows <- rbind(c(0.70, 0.10, 0.10, 0.10),
+                 c(0.10, 0.70, 0.10, 0.10),
+                 c(0.10, 0.10, 0.70, 0.10),
+                 c(0.10, 0.10, 0.10, 0.70))
+  trans <- as.vector(t(Prows[, 1:(N - 1), drop = FALSE]))   # row-major free entries
+  par_nox <- c(trans, as.vector(t(rho)))
+  ll_cpp <- -rsdc_likelihood(par_nox, y = y, exog = NULL, K = K, N = N)
+  ll_R   <- rsdc_hamilton(y, NULL, NULL, rho, K, N, Prows)$log_likelihood
+  expect_equal(ll_cpp, ll_R, tolerance = 1e-8)
+
+  # tvtp: beta is N x (N-1)*p
+  X <- cbind(1, as.numeric(scale(seq_len(T)))); p <- ncol(X)
+  beta <- matrix(rnorm(N * (N - 1L) * p, sd = 0.2), nrow = N)
+  par_tv <- c(as.vector(t(beta)), as.vector(t(rho)))
+  ll_cpp2 <- -rsdc_likelihood(par_tv, y = y, exog = X, K = K, N = N)
+  ll_R2   <- rsdc_hamilton(y, X, beta, rho, K, N)$log_likelihood
+  expect_equal(ll_cpp2, ll_R2, tolerance = 1e-8)
+})
+
 test_that("C++ log-likelihood matches the R filter for N = 3", {
   set.seed(2)
   T <- 150; K <- 2; N <- 3

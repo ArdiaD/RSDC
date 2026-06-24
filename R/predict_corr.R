@@ -110,6 +110,8 @@ rsdc_forecast <- function(method = c("tvtp", "noX", "const"),
 
   if (out_of_sample) {
     is_cut <- round(thresh * n_obs)
+    if (is_cut < 2L || n_obs - is_cut < 1L)
+      stop("Sample too small for the in-sample/out-of-sample split.")
     residuals_is <- residuals[1:is_cut, , drop = FALSE]
     residuals_oos <- residuals[(is_cut + 1):n_obs, , drop = FALSE]
     sigma_matrix_oos <- sigma_matrix[(is_cut + 1):n_obs, , drop = FALSE]
