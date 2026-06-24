@@ -4,9 +4,9 @@ bibentry(bibtype = "Manual",
   title   = "RSDC: Regime-Switching Dynamic Correlation Models in R",
   author  = c(person("David", "Ardia"),
               person("Benjamin", "Seguin"),
-              person("Roosevelt Ymele", "NGUEMO")),
+              person("Roosevelt Ymele", "Nguemo")),
   year   = "2025",
   organization = "CRAN",
-  textVersion = paste("Ardia, D., Seguin, B., NGUEMO, R. Y. (2025).",
+  textVersion = paste("Ardia, D., Seguin, B., Nguemo, R. Y. (2025).",
     "RSDC: Regime-Switching Dynamic Correlation Models in R.")
 )
