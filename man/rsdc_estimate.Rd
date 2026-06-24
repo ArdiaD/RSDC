@@ -97,8 +97,13 @@ rsdc_estimate(
 \item{control}{Optional list forwarded to the backends and optimisers:
 \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimiser
 settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
-and \code{maxit} (\code{optim}); and \code{compute_se} (default \code{TRUE}) to
-toggle the observed-information standard errors.}
+and \code{maxit} (\code{optim}); \code{compute_se} (default \code{TRUE}) to
+toggle the observed-information standard errors; and \code{n_starts}
+(default 1) to run the global+local search from several seeds
+(\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. With
+\code{n_starts > 1} the returned object also carries \code{start_logliks}
+(the log-likelihood from each start) so the stability of the optimum can be
+judged; a warm start (\code{start}) disables multi-start.}
 }
 \value{
 An object of class \code{"rsdc_fit"}: a list with components

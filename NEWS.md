@@ -1,3 +1,17 @@
+# Changes in Version 1.5-0 (DA,BS,RN)
+- Multi-start estimation: `control$n_starts` re-runs the global+local search from
+  several seeds, keeps the highest-likelihood fit, and stores `start_logliks` so
+  the stability of the optimum can be judged (guards against local optima).
+- `rsdc_forecast_ahead()`: genuine multi-step-ahead forecasts of the regime
+  distribution and implied correlations, propagating the terminal filtered state
+  through the Markov chain (`X_future` for the time-varying case).
+- `rsdc_corr_bands()`: pointwise uncertainty bands for the predicted correlation
+  path, by drawing parameters from the asymptotic sampling distribution and
+  re-running the filter.
+- `rsdc_viterbi()`: most likely (MAP) regime path via the Viterbi algorithm.
+- broom tidiers `tidy()`, `glance()`, `augment()` and a `ggplot2::autoplot()`
+  method for `rsdc_fit` (ggplot2 is a soft dependency in `Suggests`).
+
 # Changes in Version 1.4-0 (DA,BS,RN)
 - Performance: the Hamilton-filter log-likelihood used during estimation is now
   evaluated in C++ (Rcpp/RcppArmadillo), matching the R reference to ~1e-8 and

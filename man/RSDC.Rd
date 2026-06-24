@@ -25,7 +25,10 @@ reconstruction and portfolio optimization — in a single, reproducible pipeline
 \code{\link{rsdc_likelihood}} (likelihood computation),
 \code{\link{rsdc_estimate}} (parameter estimation).
 \item \strong{Correlation and covariance forecasting:}
-\code{\link{rsdc_forecast}}.
+\code{\link{rsdc_forecast}} (in-sample / 70-30 path),
+\code{\link{rsdc_forecast_ahead}} (multi-step-ahead),
+\code{\link{rsdc_corr_bands}} (parameter-uncertainty bands),
+\code{\link{rsdc_viterbi}} (most likely regime path).
 \item \strong{Portfolio construction:}
 \code{\link{rsdc_minvar}} (minimum-variance portfolios),
 \code{\link{rsdc_maxdiv}} (maximum-diversification portfolios).

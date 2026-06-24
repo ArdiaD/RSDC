@@ -1,0 +1,100 @@
+#' Uncertainty bands for the predicted correlation path
+#'
+#' Propagates parameter uncertainty into the (smoothed-probability-weighted)
+#' predicted correlation path of a fitted \code{"rsdc_fit"} model. Parameter
+#' vectors are drawn from the asymptotic sampling distribution
+#' \eqn{\mathcal{N}(\hat\theta, \widehat{\mathrm{Var}}(\hat\theta))} (using the
+#' covariance returned by \code{\link{vcov.rsdc_fit}}); for each draw the Hamilton
+#' filter/smoother is rerun and the predicted correlation path recomputed. The
+#' pointwise quantiles of these paths form the band.
+#'
+#' This reflects estimation (parameter) uncertainty in the correlation
+#' parameters and transition dynamics; it does not add the irreducible
+#' regime-classification uncertainty already summarized by the smoothed
+#' probabilities.
+#'
+#' @param object An \code{"rsdc_fit"} object (from \code{\link{rsdc_estimate}})
+#'   estimated with \code{control = list(compute_se = TRUE)} so a covariance is
+#'   available.
+#' @param residuals Optional \eqn{T \times K} residual matrix; defaults to the
+#'   matrix stored on the fit.
+#' @param X Optional \eqn{T \times p} covariate matrix (\code{"tvtp"} only);
+#'   defaults to the matrix stored on the fit.
+#' @param B Integer. Number of parameter draws (default \code{500}).
+#' @param level Confidence level for the pointwise band (default \code{0.95}).
+#' @param seed Optional integer seed for reproducibility.
+#'
+#' @returns A list with one element per correlation pair
+#'   (\eqn{C = K(K-1)/2} of them), each a \eqn{T \times 3} matrix with columns
+#'   \code{fit}, \code{lower}, \code{upper}; plus attributes \code{level} and
+#'   \code{B_used} (draws that yielded a valid path).
+#'
+#' @seealso \code{\link{rsdc_forecast}}, \code{\link{rsdc_bootstrap}}
+#' @examples
+#' \donttest{
+#' y <- scale(matrix(rnorm(250 * 2), 250, 2))
+#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#' bands <- rsdc_corr_bands(fit, B = 100)
+#' head(bands[[1]])
+#' }
+#' @importFrom stats quantile
+#' @export
+rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
+                            level = 0.95, seed = NULL) {
+  if (!inherits(object, "rsdc_fit")) stop("object must be an 'rsdc_fit'.")
+  if (is.null(object$vcov))
+    stop("rsdc_corr_bands needs a covariance matrix; refit with ",
+         "control = list(compute_se = TRUE).")
+  if (!requireNamespace("mvtnorm", quietly = TRUE))
+    stop("Package 'mvtnorm' is required for rsdc_corr_bands().")
+  method <- object$method; N <- object$N; K <- object$K
+  C <- K * (K - 1) / 2
+  if (is.null(residuals)) residuals <- object$residuals
+  if (is.null(residuals)) stop("No residuals available; pass 'residuals'.")
+  if (is.null(X) && method == "tvtp") X <- object$X
+  par <- object$par; V <- object$vcov
+  if (!is.null(seed)) set.seed(seed)
+
+  # Predicted correlation path (C x T) at a parameter vector, or NULL if invalid.
+  path_of <- function(p) {
+    up <- .rsdc_unpack_par(p, method, X, K, N)
+    if (any(abs(up$rho_matrix) >= 1)) return(NULL)
+    hh <- tryCatch(
+      rsdc_hamilton(residuals, if (method == "tvtp") X else NULL,
+                    up$beta, up$rho_matrix, K, N, up$P),
+      error = function(e) NULL)
+    sp <- hh$smoothed_probs
+    if (is.null(sp)) return(NULL)
+    pc <- matrix(0, C, ncol(sp))
+    for (s in seq_len(N)) pc <- pc + outer(up$rho_matrix[s, ], sp[s, ])
+    pc
+  }
+
+  point <- path_of(par)
+  if (is.null(point)) stop("Could not compute the point-estimate correlation path.")
+  Tn <- ncol(point)
+
+  draws <- mvtnorm::rmvnorm(B, mean = par, sigma = V)
+  paths <- vector("list", B)
+  for (b in seq_len(B)) paths[[b]] <- path_of(draws[b, ])
+  paths <- paths[!vapply(paths, is.null, logical(1))]
+  B_used <- length(paths)
+  if (B_used < 2L)
+    stop("Too few valid parameter draws produced a finite path; increase B or check the fit.")
+
+  a <- (1 - level) / 2
+  pair_labels <- {
+    cp <- utils::combn(K, 2)
+    apply(cp, 2, function(ix) sprintf("rho[%d,%d]", ix[1], ix[2]))
+  }
+  out <- vector("list", C); names(out) <- pair_labels
+  for (cc in seq_len(C)) {
+    mat <- vapply(paths, function(pc) pc[cc, ], numeric(Tn))  # T x B_used
+    lo  <- apply(mat, 1, stats::quantile, probs = a,     names = FALSE)
+    hi  <- apply(mat, 1, stats::quantile, probs = 1 - a, names = FALSE)
+    out[[cc]] <- cbind(fit = point[cc, ], lower = lo, upper = hi)
+  }
+  attr(out, "level")  <- level
+  attr(out, "B_used") <- B_used
+  out
+}

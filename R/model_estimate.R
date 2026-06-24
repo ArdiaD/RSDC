@@ -662,8 +662,13 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param control Optional list forwarded to the backends and optimisers:
 #'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimiser
 #'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
-#'   and \code{maxit} (\code{optim}); and \code{compute_se} (default \code{TRUE}) to
-#'   toggle the observed-information standard errors.
+#'   and \code{maxit} (\code{optim}); \code{compute_se} (default \code{TRUE}) to
+#'   toggle the observed-information standard errors; and \code{n_starts}
+#'   (default 1) to run the global+local search from several seeds
+#'   (\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. With
+#'   \code{n_starts > 1} the returned object also carries \code{start_logliks}
+#'   (the log-likelihood from each start) so the stability of the optimum can be
+#'   judged; a warm start (\code{start}) disables multi-start.
 #'
 #' @return An object of class \code{"rsdc_fit"}: a list with components
 #' \describe{
@@ -744,19 +749,47 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
   cl <- match.call()
   p_x <- if (!is.null(X)) ncol(X) else NA_integer_
 
-  if (method == "tvtp") {
-    if (is.null(X)) stop("X must be provided for method = 'tvtp'")
-    fit <- f_optim(N = N, residuals = residuals, X = X,
-                   out_of_sample = out_of_sample, control = control)
-  } else if (method == "noX") {
-    fit <- f_optim_noX(N = N, residuals = residuals,
-                       out_of_sample = out_of_sample, control = control)
-  } else if (method == "const") {
-    fit <- f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
-                         control = control)
-  } else {
-    stop("Unknown method: ", method)
+  if (method == "tvtp" && is.null(X)) stop("X must be provided for method = 'tvtp'")
+
+  # Single fit at a given seed (compute_se controllable for the multi-start search).
+  fit_once <- function(ctrl) {
+    if (method == "tvtp")
+      f_optim(N = N, residuals = residuals, X = X,
+              out_of_sample = out_of_sample, control = ctrl)
+    else if (method == "noX")
+      f_optim_noX(N = N, residuals = residuals,
+                  out_of_sample = out_of_sample, control = ctrl)
+    else if (method == "const")
+      f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
+                    control = ctrl)
+    else stop("Unknown method: ", method)
   }
 
-  .rsdc_finalize(fit, method = method, N = N, K = ncol(residuals), p = p_x, call = cl)
+  # Multi-start: with control$n_starts > 1, re-run the global+local search from
+  # several seeds, keep the highest-likelihood fit, and record the spread of
+  # log-likelihoods so users can judge whether the optimum is stable (a guard
+  # against local optima). A warm start (control$start) disables multi-start.
+  n_starts <- if (!is.null(control$n_starts)) as.integer(control$n_starts) else 1L
+  base_seed <- if (!is.null(control$seed)) control$seed else 123L
+  start_logliks <- NULL
+  if (n_starts > 1L && is.null(control$start)) {
+    seeds <- base_seed + seq_len(n_starts) - 1L
+    search_ctrl <- control; search_ctrl$compute_se <- FALSE; search_ctrl$n_starts <- NULL
+    fits <- lapply(seeds, function(s) { search_ctrl$seed <- s; fit_once(search_ctrl) })
+    start_logliks <- vapply(fits, function(f) f$log_likelihood, numeric(1))
+    best <- which.max(start_logliks)
+    # Recompute the winning fit with the user's compute_se setting.
+    final_ctrl <- control; final_ctrl$n_starts <- NULL; final_ctrl$seed <- seeds[best]
+    fit <- fit_once(final_ctrl)
+  } else {
+    fc <- control; fc$n_starts <- NULL
+    fit <- fit_once(fc)
+  }
+
+  out <- .rsdc_finalize(fit, method = method, N = N, K = ncol(residuals), p = p_x, call = cl)
+  if (!is.null(start_logliks)) {
+    out$n_starts      <- n_starts
+    out$start_logliks <- start_logliks
+  }
+  out
 }
