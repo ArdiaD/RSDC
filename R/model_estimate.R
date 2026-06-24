@@ -65,7 +65,8 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
   if (N < 2) stop("f_optim requires N >= 2.")
 
   con <- list(seed = 123, do_trace = FALSE, itermax = 500, NP = NULL,
-              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE)
+              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE,
+              cores = 1L, start = NULL)
   con[names(control)] <- control
 
   # TVTP needs a regime intercept to identify a baseline persistence; the package
@@ -102,32 +103,40 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     X_optim <- X
   }
 
-  # DEoptim
+  # Global search (skipped when a warm start is supplied)
   set.seed(con$seed)
-  results <- DEoptim::DEoptim(
-    fn = rsdc_likelihood,
-    lower = bounds$lower,
-    upper = bounds$upper,
-    control = list(
-      itermax = con$itermax,
-      NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
-      strategy = 2,
-      F = 0.8,
-      CR = 0.9,
-      trace = con$do_trace,
-      parallelType = con$parallelType,
-      reltol = 1e-8,
-      steptol = con$steptol
-    ),
-    y = y_optim,
-    exog = X_optim,
-    K = K,
-    N = N
-  )
+  if (!is.null(con$start)) {
+    if (length(con$start) != length(bounds$lower))
+      stop("control$start must have length ", length(bounds$lower), " for this model.")
+    de_best <- con$start
+  } else {
+    results <- DEoptim::DEoptim(
+      fn = rsdc_likelihood,
+      lower = bounds$lower,
+      upper = bounds$upper,
+      control = list(
+        itermax = con$itermax,
+        NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
+        strategy = 2,
+        F = 0.8,
+        CR = 0.9,
+        trace = con$do_trace,
+        parallelType = if (con$cores > 1L) 1L else con$parallelType,
+        packages = if (con$cores > 1L) "RSDC" else character(0),
+        reltol = 1e-8,
+        steptol = con$steptol
+      ),
+      y = y_optim,
+      exog = X_optim,
+      K = K,
+      N = N
+    )
+    de_best <- results$optim$bestmem
+  }
 
   # Optim refinement (fixed residual reference)
   result_optim <- optim(
-    par = results$optim$bestmem,
+    par = de_best,
     fn = rsdc_likelihood,
     method = "L-BFGS-B",
     lower = bounds$lower,
@@ -234,7 +243,9 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     vcov               = vcov,
     convergence        = result_optim$convergence,
     npar               = length(optim_params),
-    nobs               = nrow(y_optim)
+    nobs               = nrow(y_optim),
+    residuals          = y_optim,
+    X                  = X_optim
   )
 }
 
@@ -300,7 +311,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   if (N < 2) stop("f_optim_noX requires N >= 2.")
 
   con <- list(seed = 123, do_trace = FALSE, itermax = 500, NP = NULL,
-              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE)
+              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE,
+              cores = 1L, start = NULL)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -329,20 +341,29 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
   }
 
   set.seed(con$seed)
-  de_result <- DEoptim::DEoptim(
-    fn = rsdc_likelihood,
-    lower = bounds$lower,
-    upper = bounds$upper,
-    control = list(itermax = con$itermax,
-                   NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
-                   strategy = 2, F = 0.8, CR = 0.9,
-                   trace = con$do_trace, parallelType = con$parallelType,
-                   reltol = 1e-8, steptol = con$steptol),
-    y = y_optim, exog = NULL, K = K, N = N
-  )
+  if (!is.null(con$start)) {
+    if (length(con$start) != length(bounds$lower))
+      stop("control$start must have length ", length(bounds$lower), " for this model.")
+    de_best <- con$start
+  } else {
+    de_result <- DEoptim::DEoptim(
+      fn = rsdc_likelihood,
+      lower = bounds$lower,
+      upper = bounds$upper,
+      control = list(itermax = con$itermax,
+                     NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
+                     strategy = 2, F = 0.8, CR = 0.9,
+                     trace = con$do_trace,
+                     parallelType = if (con$cores > 1L) 1L else con$parallelType,
+                     packages = if (con$cores > 1L) "RSDC" else character(0),
+                     reltol = 1e-8, steptol = con$steptol),
+      y = y_optim, exog = NULL, K = K, N = N
+    )
+    de_best <- de_result$optim$bestmem
+  }
 
   optim_result <- optim(
-    par = de_result$optim$bestmem,
+    par = de_best,
     fn = rsdc_likelihood,
     method = "L-BFGS-B",
     lower = bounds$lower,
@@ -447,7 +468,9 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     vcov               = vcov,
     convergence        = optim_result$convergence,
     npar               = length(final_par),
-    nobs               = nrow(y_optim)
+    nobs               = nrow(y_optim),
+    residuals          = y_optim,
+    X                  = NULL
   )
 }
 
@@ -509,7 +532,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
   con <- list(seed = 123, do_trace = FALSE, itermax = 500, maxit = 1000,
-              compute_se = TRUE)
+              compute_se = TRUE, start = NULL)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -543,16 +566,23 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 
   # Fit on IS only
   set.seed(con$seed)
-  de_result <- DEoptim::DEoptim(
-    fn = neg_loglik_const,
-    lower = rep(-1, n_rho),
-    upper = rep(1, n_rho),
-    control = list(itermax = con$itermax, trace = con$do_trace),
-    y = y_is, K = K
-  )
+  if (!is.null(con$start)) {
+    if (length(con$start) != n_rho)
+      stop("control$start must have length ", n_rho, " for the constant model.")
+    de_best <- con$start
+  } else {
+    de_result <- DEoptim::DEoptim(
+      fn = neg_loglik_const,
+      lower = rep(-1, n_rho),
+      upper = rep(1, n_rho),
+      control = list(itermax = con$itermax, trace = con$do_trace),
+      y = y_is, K = K
+    )
+    de_best <- de_result$optim$bestmem
+  }
 
   optim_result <- optim(
-    par = de_result$optim$bestmem,
+    par = de_best,
     fn = neg_loglik_const,
     method = "L-BFGS-B",
     lower = rep(-1, n_rho),
@@ -592,7 +622,9 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     vcov               = vcov,
     convergence        = optim_result$convergence,
     npar               = length(rho_vec),
-    nobs               = nrow(y_is)
+    nobs               = nrow(y_is),
+    residuals          = y_is,
+    X                  = NULL
   )
 }
 

@@ -78,6 +78,28 @@
     fit$se   <- NULL
   }
 
+  # Mean covariate (tvtp) used for natural-scale transition SEs and diagnostics.
+  if (method == "tvtp" && !is.null(fit$X)) fit$avg_X <- colMeans(fit$X)
+
+  # Per-observation scores for OPG / sandwich standard errors (item 8).
+  if (!is.null(fit$vcov) && !is.null(fit$residuals))
+    fit$scores <- .rsdc_scores(fit$par, method, fit$residuals, fit$X, K, fit$N)
+
+  # Filtered/smoothed regime probabilities for plot() and diagnostics (items 4, 5).
+  if (method != "const" && !is.null(fit$residuals)) {
+    hf <- tryCatch(rsdc_hamilton(
+      y = fit$residuals,
+      X = if (method == "tvtp") fit$X else NULL,
+      beta = if (method == "tvtp") fit$beta else NULL,
+      rho_matrix = fit$correlations, K = K, N = fit$N,
+      P = if (method == "noX") fit$transition_matrix else NULL),
+      error = function(e) NULL)
+    if (!is.null(hf)) {
+      fit$filtered_probs <- hf$filtered_probs
+      fit$smoothed_probs <- hf$smoothed_probs
+    }
+  }
+
   class(fit) <- "rsdc_fit"
   fit
 }
@@ -129,21 +151,30 @@ logLik.rsdc_fit <- function(object, ...) {
 }
 
 #' @describeIn rsdc_estimate Variance-covariance matrix of the estimates.
+#'   \code{type = "hessian"} (default) uses the inverse observed information;
+#'   \code{"opg"} the outer product of gradients; \code{"sandwich"} the
+#'   QML/robust covariance \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}.
+#' @param type Covariance estimator: one of \code{"hessian"}, \code{"opg"}, \code{"sandwich"}.
 #' @exportS3Method vcov rsdc_fit
-vcov.rsdc_fit <- function(object, ...) {
+vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich"), ...) {
+  type <- match.arg(type)
   if (is.null(object$vcov))
     stop("No variance-covariance available (Hessian singular/unavailable). ",
          "Refit with control = list(compute_se = TRUE) at an interior optimum.")
-  object$vcov
+  V <- .rsdc_robust_vcov(object, type)
+  if (is.null(V)) stop("Requested covariance (", type, ") is unavailable (singular).")
+  V
 }
 
-#' @describeIn rsdc_estimate Wald confidence intervals from the observed information.
+#' @describeIn rsdc_estimate Wald confidence intervals from the chosen covariance.
 #' @param parm Vector of parameter names/indices (default: all).
 #' @param level Confidence level.
 #' @exportS3Method confint rsdc_fit
 #' @importFrom stats qnorm
-confint.rsdc_fit <- function(object, parm, level = 0.95, ...) {
-  cf <- coef(object); V <- vcov(object)
+confint.rsdc_fit <- function(object, parm, level = 0.95,
+                             type = c("hessian", "opg", "sandwich"), ...) {
+  type <- match.arg(type)
+  cf <- coef(object); V <- vcov(object, type = type)
   ses <- sqrt(diag(V))
   if (missing(parm)) parm <- names(cf)
   a <- (1 - level) / 2
@@ -171,7 +202,9 @@ summary.rsdc_fit <- function(object, ...) {
               logLik = object$log_likelihood,
               AIC = stats::AIC(object), BIC = stats::BIC(object),
               coefficients = tab, correlations = object$correlations,
-              transition_matrix = object$transition_matrix, convergence = object$convergence)
+              transition_matrix = object$transition_matrix, convergence = object$convergence,
+              natural_se = .rsdc_natural_se(object),
+              diagnostics = if (object$method != "const") .rsdc_diagnostics(object) else NULL)
   class(out) <- "summary.rsdc_fit"
   out
 }
@@ -190,6 +223,14 @@ print.summary.rsdc_fit <- function(x, digits = 4, ...) {
     cat("Coefficients: standard errors unavailable (singular Hessian).\n")
     cat("Regime correlations:\n")
     print(round(x$correlations, digits))
+  }
+  if (!is.null(x$natural_se) && !is.null(x$natural_se$transition)) {
+    cat("\nTransition probabilities (delta-method SE):\n")
+    print(format(x$natural_se$transition, digits = digits))
+  }
+  if (!is.null(x$diagnostics)) {
+    cat("\nRegime diagnostics (stay prob., expected duration, ergodic prob.):\n")
+    print(format(x$diagnostics, digits = digits))
   }
   invisible(x)
 }
@@ -240,4 +281,28 @@ simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL,
     obs[t, ] <- mvtnorm::rmvnorm(1, mu[states[t], ], sigma[, , states[t]])
   }
   list(states = states, observations = obs, transition_matrices = NULL)
+}
+
+#' @describeIn rsdc_estimate Plot the smoothed regime probabilities (one panel per
+#'   regime) for a fitted \code{"noX"}/\code{"tvtp"} model. \code{which = "filtered"}
+#'   plots filtered probabilities instead.
+#' @param which Either \code{"smoothed"} (default) or \code{"filtered"}.
+#' @exportS3Method plot rsdc_fit
+#' @importFrom graphics par plot abline
+plot.rsdc_fit <- function(x, which = c("smoothed", "filtered"), ...) {
+  which <- match.arg(which)
+  pr <- if (which == "filtered") x$filtered_probs else x$smoothed_probs
+  if (is.null(pr))
+    stop("No regime probabilities stored. The constant model has a single regime, ",
+         "or the fit was produced without them; refit with compute_se = TRUE.")
+  N <- nrow(pr); Tn <- ncol(pr)
+  op <- graphics::par(mfrow = c(N, 1), mar = c(3.2, 4, 1.4, 1), las = 1)
+  on.exit(graphics::par(op))
+  for (i in seq_len(N)) {
+    graphics::plot(seq_len(Tn), pr[i, ], type = "l", ylim = c(0, 1),
+                   xlab = if (i == N) "Time" else "", ylab = sprintf("P(regime %d)", i),
+                   main = sprintf("%s regime-%d probability", which, i), ...)
+    graphics::abline(h = c(0, 1), col = "grey80", lty = 3)
+  }
+  invisible(x)
 }

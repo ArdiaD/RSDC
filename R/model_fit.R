@@ -198,6 +198,7 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
   filtered <- matrix(0, N, n_obs)
   predicted <- matrix(0, N, n_obs)
   smoothed <- matrix(0, N, n_obs)
+  loglik_t <- numeric(n_obs)                  # per-observation log-likelihood contributions
   xi <- if (is.null(xi_init)) rep(1/N, N) else xi_init / sum(xi_init)
   log_lik <- 0
 
@@ -214,10 +215,12 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
     sum_w <- sum(w)
 
     if (!is.finite(sum_w) || sum_w <= 0)
-      return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
+      return(list(filtered_probs = NULL, smoothed_probs = NULL,
+                  log_likelihood = -Inf, loglik_t = NULL))
 
     filtered[,t] <- w / sum_w
-    log_lik <- log_lik + log(sum_w) + c_t
+    loglik_t[t]  <- log(sum_w) + c_t
+    log_lik <- log_lik + loglik_t[t]
     xi <- filtered[,t]
   }
 
@@ -230,7 +233,8 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
       temp  <- filtered[, t] * (P_t1 %*% ratio)
       s <- sum(temp)
       if (!is.finite(s) || s < .Machine$double.eps)
-        return(list(filtered_probs = NULL, smoothed_probs = NULL, log_likelihood = -Inf))
+        return(list(filtered_probs = NULL, smoothed_probs = NULL,
+                    log_likelihood = -Inf, loglik_t = NULL))
       smoothed[, t] <- temp / s
     }
   }
@@ -238,7 +242,8 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
   list(
     filtered_probs = filtered,
     smoothed_probs = smoothed,
-    log_likelihood = log_lik
+    log_likelihood = log_lik,
+    loglik_t       = loglik_t
   )
 }
 

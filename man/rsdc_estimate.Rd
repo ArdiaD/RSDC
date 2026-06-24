@@ -10,6 +10,7 @@
 \alias{summary.rsdc_fit}
 \alias{predict.rsdc_fit}
 \alias{simulate.rsdc_fit}
+\alias{plot.rsdc_fit}
 \alias{rsdc_estimate}
 \title{Estimate Regime-Switching or Constant Correlation Model (Wrapper)}
 \usage{
@@ -21,9 +22,15 @@
 
 \method{logLik}{rsdc_fit}(object, ...)
 
-\method{vcov}{rsdc_fit}(object, ...)
+\method{vcov}{rsdc_fit}(object, type = c("hessian", "opg", "sandwich"), ...)
 
-\method{confint}{rsdc_fit}(object, parm, level = 0.95, ...)
+\method{confint}{rsdc_fit}(
+  object,
+  parm,
+  level = 0.95,
+  type = c("hessian", "opg", "sandwich"),
+  ...
+)
 
 \method{summary}{rsdc_fit}(object, ...)
 
@@ -38,6 +45,8 @@
 )
 
 \method{simulate}{rsdc_fit}(object, nsim = 1, seed = NULL, X = NULL, n = NULL, ...)
+
+\method{plot}{rsdc_fit}(x, which = c("smoothed", "filtered"), ...)
 
 rsdc_estimate(
   method = c("tvtp", "noX", "const"),
@@ -54,6 +63,8 @@ rsdc_estimate(
 \item{digits}{Number of significant digits for printing.}
 
 \item{...}{Further arguments passed to methods (currently unused).}
+
+\item{type}{Covariance estimator: one of \code{"hessian"}, \code{"opg"}, \code{"sandwich"}.}
 
 \item{parm}{Vector of parameter names/indices (default: all).}
 
@@ -74,6 +85,8 @@ rsdc_estimate(
 \item{seed}{Optional RNG seed.}
 
 \item{n}{Series length for \code{"noX"}/\code{"const"} (defaults to the fitted T).}
+
+\item{which}{Either \code{"smoothed"} (default) or \code{"filtered"}.}
 
 \item{method}{Character. One of \code{"tvtp"}, \code{"noX"}, \code{"const"}.}
 
@@ -134,8 +147,11 @@ Unified front-end that dispatches to one of three estimators:
 \code{stats::AIC}/\code{BIC} work out of the box).
 
 \item \code{vcov(rsdc_fit)}: Variance-covariance matrix of the estimates.
+\code{type = "hessian"} (default) uses the inverse observed information;
+\code{"opg"} the outer product of gradients; \code{"sandwich"} the
+QML/robust covariance \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}.
 
-\item \code{confint(rsdc_fit)}: Wald confidence intervals from the observed information.
+\item \code{confint(rsdc_fit)}: Wald confidence intervals from the chosen covariance.
 
 \item \code{summary(rsdc_fit)}: Summary with a coefficient table (estimate, SE, z, p).
 
@@ -146,6 +162,10 @@ and (for \code{"tvtp"}) the covariate matrix \code{X}.
 \item \code{simulate(rsdc_fit)}: Simulate from a fitted model. For \code{"tvtp"} supply
 a covariate matrix \code{X} (its row count sets the length); for \code{"noX"}
 the fixed transition matrix is used; for \code{"const"} a single regime is drawn.
+
+\item \code{plot(rsdc_fit)}: Plot the smoothed regime probabilities (one panel per
+regime) for a fitted \code{"noX"}/\code{"tvtp"} model. \code{which = "filtered"}
+plots filtered probabilities instead.
 
 }}
 \examples{

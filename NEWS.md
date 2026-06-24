@@ -1,3 +1,18 @@
+# Changes in Version 1.4-0 (DA,BS,RN)
+- Optimiser control: `control` now also accepts `cores` (parallel `DEoptim` via
+  `parallelType = 1`) and `start` (a warm-start parameter vector that skips the
+  global search and goes straight to local refinement).
+- Robust standard errors: `vcov()`/`confint()` gain a `type` argument —
+  `"hessian"` (default), `"opg"` (outer product of gradients), or `"sandwich"`
+  (QML). Per-observation scores are stored on the fitted object.
+- `summary()` now reports delta-method standard errors on the natural scale of
+  the transition probabilities, plus regime diagnostics (stay probability,
+  expected duration, ergodic distribution).
+- Added a `plot()` method for fitted models (smoothed/filtered regime
+  probabilities).
+- Fitted objects now store the estimation residuals/covariates and the
+  filtered/smoothed regime probabilities.
+
 # Changes in Version 1.3-0 (DA,BS,RN)
 - `rsdc_estimate()` now returns an object of class `"rsdc_fit"` with standard S3
   methods: `print`, `summary`, `coef`, `logLik`, `nobs`, `vcov`, `confint`,
