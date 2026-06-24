@@ -40,7 +40,7 @@ object of class \code{"rsdc_fit"} with \code{print}, \code{summary},
 
 \section{Authors}{
 
-David Ardia, Benjamin Seguin and Roosevelt Ymele NGUEMO
+David Ardia and Benjamin Seguin, with contributions from Roosevelt Ymele NGUEMO.
 }
 
 \references{
