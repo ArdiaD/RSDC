@@ -70,7 +70,7 @@
 
   if (!is.null(fit$vcov) && all(dim(fit$vcov) == length(labs))) {
     dimnames(fit$vcov) <- list(labs, labs)
-    se <- sqrt(pmax(diag(fit$vcov), NA_real_))
+    se <- .rsdc_safe_sqrt(diag(fit$vcov))
     names(se) <- labs
     fit$se <- se
   } else {

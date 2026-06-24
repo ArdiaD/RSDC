@@ -4,6 +4,14 @@
 #    probabilities and regime correlations (item 7)
 #  - Markov-chain regime diagnostics (item 5)
 
+#' Element-wise sqrt that maps negative variances to NA (without NA-propagating
+#' the whole vector, as \code{pmax(x, NA)} would). Used for standard errors.
+#' @noRd
+.rsdc_safe_sqrt <- function(v) {
+  v[!is.finite(v) | v < 0] <- NA_real_
+  sqrt(v)
+}
+
 #' Per-observation log-likelihood contributions at a parameter vector
 #'
 #' Mirrors the parameter packing of \code{rsdc_likelihood} but returns the vector
@@ -142,7 +150,7 @@
   out <- list()
   # regime correlations (direct from vcov: rho are parameters, last N*C entries)
   rho_idx <- (np - N * C + 1):np
-  rho_se  <- sqrt(pmax(diag(V)[rho_idx], NA_real_))
+  rho_se  <- .rsdc_safe_sqrt(diag(V)[rho_idx])
   out$correlations <- data.frame(
     regime = rep(seq_len(N), each = C),
     estimate = par[rho_idx], se = rho_se, row.names = NULL)
@@ -151,7 +159,7 @@
     J <- tryCatch(numDeriv::jacobian(P_of_par, par), error = function(e) NULL)
     if (!is.null(J)) {
       Pvar <- diag(J %*% V %*% t(J))
-      Pse  <- sqrt(pmax(Pvar, NA_real_))
+      Pse  <- .rsdc_safe_sqrt(Pvar)
       Pest <- P_of_par(par)
       idx  <- as.vector(t(matrix(seq_len(N * N), N, N)))  # labels row-major
       lab  <- outer(seq_len(N), seq_len(N), function(i, j) paste0("p[", i, ",", j, "]"))
