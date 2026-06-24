@@ -48,6 +48,7 @@
 #' @importFrom Rcpp sourceCpp
 #' @importFrom DEoptim DEoptim
 #' @importFrom stats optim plogis cor sd
+#' @importFrom stats nobs coef logLik vcov confint predict simulate
 #' @importFrom utils combn
 NULL
 

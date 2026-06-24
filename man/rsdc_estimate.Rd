@@ -64,6 +64,8 @@ rsdc_estimate(
 
 \item{...}{Further arguments passed to methods (currently unused).}
 
+\item{object}{An object of class \code{"rsdc_fit"}.}
+
 \item{type}{Covariance estimator: one of \code{"hessian"}, \code{"opg"}, \code{"sandwich"}.}
 
 \item{parm}{Vector of parameter names/indices (default: all).}

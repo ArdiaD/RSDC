@@ -6,6 +6,9 @@
 - Optimiser control: `control` now also accepts `cores` (parallel `DEoptim` via
   `parallelType = 1`) and `start` (a warm-start parameter vector that skips the
   global search and goes straight to local refinement).
+- Parametric bootstrap: `rsdc_bootstrap()` simulates from the fitted model,
+  re-estimates each replicate warm-started at the MLE, and returns bootstrap
+  standard errors / percentile intervals that respect the parameter bounds.
 - Robust standard errors: `vcov()`/`confint()` gain a `type` argument —
   `"hessian"` (default), `"opg"` (outer product of gradients), or `"sandwich"`
   (QML). Per-observation scores are stored on the fitted object.

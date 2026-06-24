@@ -108,6 +108,7 @@
 
 #' @describeIn rsdc_estimate Compact printer for a fitted model.
 #' @param x An object of class \code{"rsdc_fit"}.
+#' @param object An object of class \code{"rsdc_fit"}.
 #' @param digits Number of significant digits for printing.
 #' @param ... Further arguments passed to methods (currently unused).
 #' @exportS3Method print rsdc_fit
