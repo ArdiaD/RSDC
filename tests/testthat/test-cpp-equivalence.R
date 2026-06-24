@@ -1,0 +1,37 @@
+# The C++ log-likelihood used by rsdc_likelihood() must reproduce the pure-R
+# Hamilton filter rsdc_hamilton() to numerical precision (added in 1.4-0).
+
+test_that("C++ log-likelihood matches the R Hamilton filter (noX and tvtp)", {
+  set.seed(1)
+  T <- 120; K <- 3; N <- 2
+  y <- scale(matrix(rnorm(T * K), T, K))
+  rho <- rbind(c(0.10, 0.05, 0.00), c(0.60, 0.40, 0.30))
+
+  # Fixed transition (noX): params = (p11, p22, rho rows...)
+  par_nox <- c(0.9, 0.8, as.vector(t(rho)))
+  ll_cpp  <- -rsdc_likelihood(par_nox, y = y, exog = NULL, K = K, N = N)
+  P       <- matrix(c(0.9, 0.1, 0.2, 0.8), 2, byrow = TRUE)
+  ll_R    <- rsdc_hamilton(y, NULL, NULL, rho, K, N, P)$log_likelihood
+  expect_equal(ll_cpp, ll_R, tolerance = 1e-8)
+
+  # TVTP: params = (beta rows..., rho rows...)
+  X <- cbind(1, as.numeric(scale(seq_len(T))))
+  beta <- rbind(c(1.2, 0.0), c(0.8, -0.1))
+  par_tv  <- c(as.vector(t(beta)), as.vector(t(rho)))
+  ll_cpp2 <- -rsdc_likelihood(par_tv, y = y, exog = X, K = K, N = N)
+  ll_R2   <- rsdc_hamilton(y, X, beta, rho, K, N)$log_likelihood
+  expect_equal(ll_cpp2, ll_R2, tolerance = 1e-8)
+})
+
+test_that("C++ log-likelihood matches the R filter for N = 3", {
+  set.seed(2)
+  T <- 150; K <- 2; N <- 3
+  y <- scale(matrix(rnorm(T * K), T, K))
+  rho <- rbind(0.1, 0.5, 0.85)                       # N x C, C = 1
+  X <- cbind(1, as.numeric(scale(seq_len(T)))); p <- ncol(X)
+  beta <- rbind(c(0.5, 0, 0.2, 0), c(0.3, 0, 0.1, 0), c(0.4, 0, -0.1, 0))
+  par_tv <- c(as.vector(t(beta)), as.vector(t(rho)))
+  ll_cpp <- -rsdc_likelihood(par_tv, y = y, exog = X, K = K, N = N)
+  ll_R   <- rsdc_hamilton(y, X, beta, rho, K, N)$log_likelihood
+  expect_equal(ll_cpp, ll_R, tolerance = 1e-8)
+})

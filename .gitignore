@@ -56,3 +56,9 @@ inst/simulation/plots/
 inst/simulation/results/
 inst/empirical/results/*.rds
 inst/empirical/results/*.csv
+
+# Compiled objects
+src/*.o
+src/*.so
+src/*.dll
+src/*.dylib

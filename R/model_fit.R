@@ -371,10 +371,23 @@ rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
   # Check correlation validity
   if (any(abs(rho_matrix) >= 1)) return(1e10)
 
-  # Run Hamilton filter
-  result <- rsdc_hamilton(y, exog, beta, rho_matrix, K, N, P)
+  # Build regime correlation matrices (identical to rsdc_hamilton)
+  sigma <- array(0, dim = c(K, K, N))
+  for (m in 1:N) {
+    Rm <- diag(K)
+    Rm[lower.tri(Rm)] <- rho_matrix[m, ]
+    Rm[upper.tri(Rm)] <- t(Rm)[upper.tri(Rm)]
+    sigma[, , m] <- Rm
+  }
 
-  if (!is.finite(result$log_likelihood)) return(1e10)
+  # Fast C++ log-likelihood (mirrors the rsdc_hamilton filter exactly).
+  empty <- matrix(0, 0, 0)
+  ll <- if (is.null(exog))
+    rsdc_loglik_cpp(as.matrix(y), sigma, 0L, P, empty, empty, numeric(0))
+  else
+    rsdc_loglik_cpp(as.matrix(y), sigma, 1L, empty, as.matrix(exog),
+                    as.matrix(beta), numeric(0))
 
-  return(-result$log_likelihood)
+  if (!is.finite(ll)) return(1e10)
+  return(-ll)
 }

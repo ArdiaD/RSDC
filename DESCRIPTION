@@ -21,7 +21,11 @@ Imports:
     numDeriv,
     graphics,
     stats,
-    utils
+    utils,
+    Rcpp
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
 Suggests:
     knitr,
     rmarkdown,

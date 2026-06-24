@@ -1,4 +1,8 @@
 # Changes in Version 1.4-0 (DA,BS,RN)
+- Performance: the Hamilton-filter log-likelihood used during estimation is now
+  evaluated in C++ (Rcpp/RcppArmadillo), matching the R reference to ~1e-8 and
+  cutting estimation time by roughly an order of magnitude. The pure-R
+  `rsdc_hamilton()` is retained (and used as the equivalence reference).
 - Optimiser control: `control` now also accepts `cores` (parallel `DEoptim` via
   `parallelType = 1`) and `start` (a warm-start parameter vector that skips the
   global search and goes straight to local refinement).
