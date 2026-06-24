@@ -57,6 +57,19 @@ test_that("broom tidiers (tidy/glance/augment) work", {
   expect_true(".state" %in% names(au))
 })
 
+test_that("vcov/confint accept the simulation-based type = 'bootstrap'", {
+  skip_on_cran()
+  set.seed(7); y <- scale(matrix(rnorm(250 * 2), 250, 2))
+  f <- rsdc_estimate("noX", residuals = y, N = 2, control = list(itermax = 40))
+  np <- length(coef(f))
+  Vb <- vcov(f, type = "bootstrap", B = 30, seed = 1)
+  expect_equal(dim(Vb), c(np, np))
+  expect_true(all(diag(Vb) >= 0))
+  ci <- confint(f, type = "bootstrap", B = 30, seed = 1)
+  expect_equal(nrow(ci), np)
+  expect_true(all(ci[, 1] <= ci[, 2]))
+})
+
 test_that("autoplot returns a ggplot for switching models", {
   skip_on_cran()
   skip_if_not_installed("ggplot2")

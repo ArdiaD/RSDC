@@ -20,7 +20,7 @@ library(RSDC)
 This vignette walks through the package API: estimating the three model
 variants, using the standard S3 methods on a fitted object, comparing models with
 `AIC`/`BIC`, forecasting, and simulating. To keep the build fast we use a small
-simulated data set and a reduced optimiser budget via `control`; in real use, keep
+simulated data set and a reduced optimizer budget via `control`; in real use, keep
 the defaults.
 
 ## A fitted object is an `"rsdc_fit"`
@@ -95,7 +95,7 @@ table(sim2$states)
 ## Genuine out-of-sample forecasts
 
 For a look-ahead-free forecast, set `out_of_sample = TRUE`: the filter is run on the
-first 70% of the sample, its terminal state initialises the held-out run, and the
+first 70% of the sample, its terminal state initializes the held-out run, and the
 out-of-sample correlations are weighted by **filtered** (not smoothed) probabilities
 so no future information leaks in.
 
@@ -110,10 +110,11 @@ fc_oos$BIC                            # out-of-sample predictive score
 
 The following tools were added in version 1.5-0.
 
-**Multi-start estimation.** `control$n_starts` re-runs the global + local search
+**Multi-start estimation.** `control$n_starts` repeats the global + local search
 from several seeds and keeps the highest-likelihood fit, storing each start's
-log-likelihood so you can judge whether the optimum is stable (a guard against
-local optima):
+log-likelihood. Because `DEoptim` is a *stochastic* global search whose result
+depends on the seed, this is primarily a stability/reproducibility diagnostic
+(do the seeds agree?) rather than a replacement for the global search:
 
 ```{r multistart}
 fit_ms <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X,

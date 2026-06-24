@@ -40,11 +40,11 @@ correlation matrix.}
 \item{P}{Optional \eqn{N \times N} fixed transition matrix. Used only when \code{X} or \code{beta} is \code{NULL}.}
 
 \item{xi_init}{Optional numeric vector of length \code{N}. If supplied, the
-forward filter is initialised from this vector (normalised internally to sum
+forward filter is initialized from this vector (normalized internally to sum
 to 1) instead of the default uniform \eqn{1/N}. Intended for two-pass
 out-of-sample forecasting: run the filter on the in-sample period first,
 extract the terminal column of \code{filtered_probs}, and pass it here to
-initialise the out-of-sample filter run. Must be non-negative and finite.}
+initialize the out-of-sample filter run. Must be non-negative and finite.}
 
 \item{engine}{Character; \code{"cpp"} (default) runs the filter/smoother in C++
 (\pkg{RcppArmadillo}), \code{"r"} the pure-R reference. Both give identical
@@ -79,7 +79,7 @@ from \code{rho_matrix[m, ]} (lower-triangular fill + symmetrization). Non-PD pro
 for \eqn{N=2}, \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
 \eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});
 for \eqn{N \ge 3}, a softmax over \eqn{N-1} free logit vectors per row with
-the \eqn{N}-th logit fixed at 0 (reference category); log-sum-exp stabilised.
+the \eqn{N}-th logit fixed at 0 (reference category); log-sum-exp stabilized.
 }
 \item \strong{Numerical safeguards:} A small ridge is added before inversion; if filtering
 degenerates at a time step, \code{log_likelihood = -Inf} is returned.

@@ -413,7 +413,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     sigma_array[,,i] <- R
   }
 
-  # Build transition matrix. N=2 keeps the diagonal-stay parameterisation
+  # Build transition matrix. N=2 keeps the diagonal-stay parameterization
   # (param i = p_ii); for N >= 3 the free entries fill the first N-1 columns and
   # the last column is the row complement (generic for any N).
   trans_params <- final_par[1:n_trans]
@@ -428,9 +428,9 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     for (i in 1:N) {
       free <- trans_params[((i - 1L) * (N - 1L) + 1L):(i * (N - 1L))]
       row  <- c(free, 1 - sum(free))
-      # A row can be infeasible (any entry < 0) when the optimiser has not reached
+      # A row can be infeasible (any entry < 0) when the optimizer has not reached
       # a feasible simplex, or after the identifiability re-ordering re-references
-      # the free entries. Project onto the simplex (clamp negatives, renormalise)
+      # the free entries. Project onto the simplex (clamp negatives, renormalize)
       # so a valid stochastic matrix is always returned, and flag non-convergence.
       if (any(row < 0)) {
         infeasible_row <- TRUE
@@ -451,7 +451,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     # non-stationary point is not a valid basis for inference).
     optim_result$convergence <- 99L
     warning("Transition matrix had an infeasible row (free probabilities summed > 1) ",
-            "and was projected onto the simplex; the optimiser did not converge to a ",
+            "and was projected onto the simplex; the optimizer did not converge to a ",
             "feasible optimum. Standard errors are suppressed (convergence flagged). ",
             "Increase control$itermax or control$NP.")
   }
@@ -659,16 +659,19 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
 #' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
-#' @param control Optional list forwarded to the backends and optimisers:
-#'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimiser
+#' @param control Optional list forwarded to the backends and optimizers:
+#'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer
 #'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
 #'   and \code{maxit} (\code{optim}); \code{compute_se} (default \code{TRUE}) to
 #'   toggle the observed-information standard errors; and \code{n_starts}
-#'   (default 1) to run the global+local search from several seeds
-#'   (\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. With
-#'   \code{n_starts > 1} the returned object also carries \code{start_logliks}
-#'   (the log-likelihood from each start) so the stability of the optimum can be
-#'   judged; a warm start (\code{start}) disables multi-start.
+#'   (default 1) to repeat the global+local search from several seeds
+#'   (\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. Because
+#'   \pkg{DEoptim} is a \emph{stochastic} global search, its result depends on the
+#'   seed; \code{n_starts > 1} is therefore primarily a \strong{stability
+#'   diagnostic} (not a replacement for the global search): the returned object
+#'   carries \code{start_logliks} (one log-likelihood per start) so you can check
+#'   whether the optimum is reproducible across seeds. A warm start
+#'   (\code{start}) disables multi-start.
 #'
 #' @return An object of class \code{"rsdc_fit"}: a list with components
 #' \describe{

@@ -13,7 +13,7 @@
 #' fitted (fixed) transition matrix; for \code{"const"} as i.i.d. draws from the single
 #' regime. Each replicate is re-estimated with the same \code{method}/\code{N} and
 #' \code{control = list(start = coef(object), compute_se = FALSE)}, which warm-starts the
-#' local optimiser at the original estimates (fast, deterministic given a seed).
+#' local optimizer at the original estimates (fast, deterministic given a seed).
 #' Replicates whose re-estimation fails are dropped.
 #'
 #' @param object An object of class \code{"rsdc_fit"}.

@@ -22,13 +22,13 @@
 
 \method{logLik}{rsdc_fit}(object, ...)
 
-\method{vcov}{rsdc_fit}(object, type = c("hessian", "opg", "sandwich"), ...)
+\method{vcov}{rsdc_fit}(object, type = c("hessian", "opg", "sandwich", "bootstrap"), ...)
 
 \method{confint}{rsdc_fit}(
   object,
   parm,
   level = 0.95,
-  type = c("hessian", "opg", "sandwich"),
+  type = c("hessian", "opg", "sandwich", "bootstrap"),
   ...
 )
 
@@ -66,7 +66,8 @@ rsdc_estimate(
 
 \item{object}{An object of class \code{"rsdc_fit"}.}
 
-\item{type}{Covariance estimator: one of \code{"hessian"}, \code{"opg"}, \code{"sandwich"}.}
+\item{type}{Covariance estimator: one of \code{"hessian"}, \code{"opg"},
+\code{"sandwich"} (numerical) or \code{"bootstrap"} (simulation-based).}
 
 \item{parm}{Vector of parameter names/indices (default: all).}
 
@@ -94,16 +95,19 @@ rsdc_estimate(
 
 \item{N}{Integer. Number of regimes. Ignored when \code{method = "const"}.}
 
-\item{control}{Optional list forwarded to the backends and optimisers:
-\code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimiser
+\item{control}{Optional list forwarded to the backends and optimizers:
+\code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer
 settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
 and \code{maxit} (\code{optim}); \code{compute_se} (default \code{TRUE}) to
 toggle the observed-information standard errors; and \code{n_starts}
-(default 1) to run the global+local search from several seeds
-(\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. With
-\code{n_starts > 1} the returned object also carries \code{start_logliks}
-(the log-likelihood from each start) so the stability of the optimum can be
-judged; a warm start (\code{start}) disables multi-start.}
+(default 1) to repeat the global+local search from several seeds
+(\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. Because
+\pkg{DEoptim} is a \emph{stochastic} global search, its result depends on the
+seed; \code{n_starts > 1} is therefore primarily a \strong{stability
+diagnostic} (not a replacement for the global search): the returned object
+carries \code{start_logliks} (one log-likelihood per start) so you can check
+whether the optimum is reproducible across seeds. A warm start
+(\code{start}) disables multi-start.}
 }
 \value{
 An object of class \code{"rsdc_fit"}: a list with components
@@ -153,12 +157,17 @@ Unified front-end that dispatches to one of three estimators:
 \item \code{logLik(rsdc_fit)}: Log-likelihood (carries \code{df} and \code{nobs} so
 \code{stats::AIC}/\code{BIC} work out of the box).
 
-\item \code{vcov(rsdc_fit)}: Variance-covariance matrix of the estimates.
-\code{type = "hessian"} (default) uses the inverse observed information;
-\code{"opg"} the outer product of gradients; \code{"sandwich"} the
-QML/robust covariance \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}.
+\item \code{vcov(rsdc_fit)}: Variance-covariance matrix of the estimates. The
+\emph{numerical} estimators are \code{type = "hessian"} (default, inverse
+observed information), \code{"opg"} (outer product of gradients) and
+\code{"sandwich"} (QML/robust \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}); the
+\emph{simulation-based} estimator is \code{"bootstrap"}, which calls
+\code{\link{rsdc_bootstrap}} (pass \code{B} and \code{seed} through
+\code{...}). The bootstrap is recomputed on each call.
 
-\item \code{confint(rsdc_fit)}: Wald confidence intervals from the chosen covariance.
+\item \code{confint(rsdc_fit)}: Wald confidence intervals from the chosen covariance
+(numerical or \code{"bootstrap"}). For bootstrap \emph{percentile} intervals
+instead of Wald, use \code{\link{rsdc_bootstrap}} directly.
 
 \item \code{summary(rsdc_fit)}: Summary with a coefficient table (estimate, SE, z, p).
 

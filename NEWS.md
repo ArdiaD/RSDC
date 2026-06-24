@@ -1,7 +1,8 @@
 # Changes in Version 1.5-0 (DA,BS,RN)
-- Multi-start estimation: `control$n_starts` re-runs the global+local search from
-  several seeds, keeps the highest-likelihood fit, and stores `start_logliks` so
-  the stability of the optimum can be judged (guards against local optima).
+- Multi-start estimation: `control$n_starts` repeats the global+local search from
+  several seeds and keeps the highest-likelihood fit, storing `start_logliks`.
+  Since `DEoptim` is a stochastic global search, this is primarily a stability
+  diagnostic across seeds (is the optimum reproducible?), not a replacement for it.
 - `rsdc_forecast_ahead()`: genuine multi-step-ahead forecasts of the regime
   distribution and implied correlations, propagating the terminal filtered state
   through the Markov chain (`X_future` for the time-varying case).
@@ -20,7 +21,7 @@
   evaluated in C++ (Rcpp/RcppArmadillo), matching the R reference to ~1e-8 and
   cutting estimation time by roughly an order of magnitude. The pure-R
   `rsdc_hamilton()` is retained (and used as the equivalence reference).
-- Optimiser control: `control` now also accepts `cores` (parallel `DEoptim` via
+- Optimizer control: `control` now also accepts `cores` (parallel `DEoptim` via
   `parallelType = 1`) and `start` (a warm-start parameter vector that skips the
   global search and goes straight to local refinement).
 - Parametric bootstrap: `rsdc_bootstrap()` simulates from the fitted model,
@@ -45,7 +46,7 @@
   variance estimates map to `NA` instead of producing inconsistent `NaN`
   intervals.
 - For the fixed-transition `noX` model with `N >= 3`, a transition row that the
-  optimiser leaves infeasible (free probabilities summing above 1) is still
+  optimizer leaves infeasible (free probabilities summing above 1) is still
   projected onto the simplex, but the fit is now flagged as non-converged and its
   standard errors are suppressed (the projected point is not a valid basis for
   inference).
@@ -59,7 +60,7 @@
   from the numerical Hessian of the negative log-likelihood at the MLE.
 - Arbitrary number of regimes: `N >= 4` is now supported for `"noX"` and `"tvtp"`
   (previously capped at `N = 3`).
-- `control` now forwards optimiser settings (`itermax`, `NP`, `parallelType`,
+- `control` now forwards optimizer settings (`itermax`, `NP`, `parallelType`,
   `steptol`, `maxit`, and `compute_se`) to `DEoptim`/`optim`, enabling faster runs.
 - Robustness: warns when a transition probability is pinned to its bound and when
   a `"tvtp"` covariate matrix `X` has no intercept/constant column.
@@ -77,16 +78,16 @@
 - Fixed `greenbrown` documentation: date range is 2014-01-02 to 2022-12-30.
 
 # Changes in Version 1.1-2 (BS,DA)
-- DESCRIPTION improved following CRAN's guidelines
+- DESCRIPTION improved following the CRAN guidelines
 - Seed is now a control parameter
 - Removed examples for unexported functions
-- Fixed donot run examples
+- Fixed do-not-run examples
 - Added green-brown-ptf data in extdata
 - Data added under the right .rda format
 - Data Documentation added
 
 # Changes in Version 1.1-1 (DA)
-- URls fixed
+- URLs fixed
 
 # Changes in Version 1.1-0 (DA)
 - First release public version

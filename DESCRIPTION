@@ -12,6 +12,7 @@ Description: Estimation, forecasting, simulation, and portfolio construction for
     Pelletier (2006) <doi:10.1016/j.jeconom.2005.01.013>.
 License: GPL-3
 Encoding: UTF-8
+Language: en-US
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/ArdiaD/RSDC
 BugReports: https://github.com/ArdiaD/RSDC/issues

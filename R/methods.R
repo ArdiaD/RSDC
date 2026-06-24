@@ -151,14 +151,23 @@ logLik.rsdc_fit <- function(object, ...) {
   val
 }
 
-#' @describeIn rsdc_estimate Variance-covariance matrix of the estimates.
-#'   \code{type = "hessian"} (default) uses the inverse observed information;
-#'   \code{"opg"} the outer product of gradients; \code{"sandwich"} the
-#'   QML/robust covariance \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}.
-#' @param type Covariance estimator: one of \code{"hessian"}, \code{"opg"}, \code{"sandwich"}.
+#' @describeIn rsdc_estimate Variance-covariance matrix of the estimates. The
+#'   \emph{numerical} estimators are \code{type = "hessian"} (default, inverse
+#'   observed information), \code{"opg"} (outer product of gradients) and
+#'   \code{"sandwich"} (QML/robust \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}); the
+#'   \emph{simulation-based} estimator is \code{"bootstrap"}, which calls
+#'   \code{\link{rsdc_bootstrap}} (pass \code{B} and \code{seed} through
+#'   \code{...}). The bootstrap is recomputed on each call.
+#' @param type Covariance estimator: one of \code{"hessian"}, \code{"opg"},
+#'   \code{"sandwich"} (numerical) or \code{"bootstrap"} (simulation-based).
 #' @exportS3Method vcov rsdc_fit
-vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich"), ...) {
+vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich", "bootstrap"), ...) {
   type <- match.arg(type)
+  if (type == "bootstrap") {
+    dots <- list(...)
+    B    <- if (!is.null(dots$B)) dots$B else 199L
+    return(rsdc_bootstrap(object, B = B, X = dots$X, seed = dots$seed)$vcov)
+  }
   if (is.null(object$vcov))
     stop("No variance-covariance available (Hessian singular/unavailable). ",
          "Refit with control = list(compute_se = TRUE) at an interior optimum.")
@@ -167,15 +176,17 @@ vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich"), ...) {
   V
 }
 
-#' @describeIn rsdc_estimate Wald confidence intervals from the chosen covariance.
+#' @describeIn rsdc_estimate Wald confidence intervals from the chosen covariance
+#'   (numerical or \code{"bootstrap"}). For bootstrap \emph{percentile} intervals
+#'   instead of Wald, use \code{\link{rsdc_bootstrap}} directly.
 #' @param parm Vector of parameter names/indices (default: all).
 #' @param level Confidence level.
 #' @exportS3Method confint rsdc_fit
 #' @importFrom stats qnorm
 confint.rsdc_fit <- function(object, parm, level = 0.95,
-                             type = c("hessian", "opg", "sandwich"), ...) {
+                             type = c("hessian", "opg", "sandwich", "bootstrap"), ...) {
   type <- match.arg(type)
-  cf <- coef(object); V <- vcov(object, type = type)
+  cf <- coef(object); V <- vcov(object, type = type, ...)
   ses <- .rsdc_safe_sqrt(diag(V))  # consistent with summary(); non-PD diagonals -> NA
   if (missing(parm)) parm <- names(cf)
   a <- (1 - level) / 2

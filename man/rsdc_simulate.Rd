@@ -14,7 +14,7 @@ probabilities. Row \code{X[1, ]} forms \eqn{P_1}, used only to draw the initial
 state from \eqn{t(P_1)\,\pi_0}; rows \code{X[t, ]} for \eqn{t \ge 2} form \eqn{P_t}.}
 
 \item{beta}{Numeric matrix \eqn{N \times (N-1) \cdot p}. Transition coefficients
-packed row-wise by regime, matching the parameterisation of
+packed row-wise by regime, matching the parameterization of
 \code{\link{rsdc_hamilton}} and \code{\link{rsdc_estimate}}. For \eqn{N=2},
 each row is a length-\eqn{p} logistic vector:
 \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N=3},
@@ -57,7 +57,7 @@ from \eqn{\mathcal{N}(\mu_{S_1}, \Sigma_{S_1})}.
 \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}; for
 \eqn{N \ge 3}, a softmax is used with \eqn{N-1} free logit vectors per
 row and the \eqn{N}-th logit fixed at zero (reference category).
-Both use log-sum-exp stabilisation.
+Both use log-sum-exp stabilization.
 \item \strong{Sampling:} Given \eqn{S_{t-1}}, draw \eqn{S_t} from the categorical
 distribution with probabilities \eqn{P_t(S_{t-1}, \cdot)} and
 \eqn{y_t \sim \mathcal{N}(\mu_{S_t}, \Sigma_{S_t})}.
