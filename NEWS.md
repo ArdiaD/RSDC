@@ -1,3 +1,20 @@
+# Changes in Version 1.3-0 (DA,BS,RN)
+- `rsdc_estimate()` now returns an object of class `"rsdc_fit"` with standard S3
+  methods: `print`, `summary`, `coef`, `logLik`, `nobs`, `vcov`, `confint`,
+  `predict`, and `simulate`. `AIC()`/`BIC()` work out of the box via `logLik`.
+- Standard errors: the estimator now returns the observed-information
+  variance-covariance (`vcov`) and standard errors (`summary`/`confint`), computed
+  from the numerical Hessian of the negative log-likelihood at the MLE.
+- Arbitrary number of regimes: `N >= 4` is now supported for `"noX"` and `"tvtp"`
+  (previously capped at `N = 3`).
+- `control` now forwards optimiser settings (`itermax`, `NP`, `parallelType`,
+  `steptol`, `maxit`, and `compute_se`) to `DEoptim`/`optim`, enabling faster runs.
+- Robustness: warns when a transition probability is pinned to its bound and when
+  a `"tvtp"` covariate matrix `X` has no intercept/constant column.
+- Added a "Getting started" vignette.
+- Moved the 596 KB source workbook out of `inst/extdata` into build-ignored
+  `data-raw/` to shrink the package tarball.
+
 # Changes in Version 1.2-0 (BS,DA,RN)
 - Added `mccc` dataset: daily Media Climate Change Concerns (Aggregate) index,
   forward-filled from monthly and aligned row-for-row to `greenbrown`. Supplies

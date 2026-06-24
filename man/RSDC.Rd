@@ -3,7 +3,7 @@
 \name{RSDC}
 \alias{RSDC}
 \alias{RSDC-package}
-\title{RSDC: Regime-Switching Correlation Models for Portfolio Analysis}
+\title{RSDC: Regime-Switching Dynamic Correlation Models}
 \description{
 The \pkg{RSDC} package provides a comprehensive framework for modeling,
 estimating, and forecasting correlation structures in multivariate time
@@ -31,6 +31,10 @@ reconstruction and portfolio optimization — in a single, reproducible pipeline
 \code{\link{rsdc_maxdiv}} (maximum-diversification portfolios).
 \item \strong{Simulation:}
 \code{\link{rsdc_simulate}} (simulate TVTP regime-switching series).
+\item \strong{Fitted-model methods:} \code{rsdc_estimate()} returns an
+object of class \code{"rsdc_fit"} with \code{print}, \code{summary},
+\code{coef}, \code{logLik} (so \code{AIC}/\code{BIC} work), \code{nobs},
+\code{vcov}, \code{confint}, \code{predict}, and \code{simulate} methods.
 }
 }
 

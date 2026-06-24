@@ -10,7 +10,8 @@
 #'   \item{return_brown}{Numeric returns for the brown portfolio.}
 #' }
 #'
-#' @source Originally data in \code{inst/extdata/green-brown-ptf.xlsx}.
+#' @source Built from the source workbook in \code{data-raw/green-brown-ptf.xlsx}
+#'   (not shipped on CRAN); see \code{data-raw/greenbrown.R}.
 #'
 #' @examples
 #' data("greenbrown")

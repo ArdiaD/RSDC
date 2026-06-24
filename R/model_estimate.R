@@ -61,11 +61,18 @@
 #' @importFrom stats optim plogis
 #' @noRd
 f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
-  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
   stopifnot(is.matrix(residuals))
+  if (N < 2) stop("f_optim requires N >= 2.")
 
-  con <- list(seed = 123, do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE, itermax = 500, NP = NULL,
+              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE)
   con[names(control)] <- control
+
+  # TVTP needs a regime intercept to identify a baseline persistence; the package
+  # does not add one. Warn if X has no constant column.
+  if (!any(apply(X, 2, function(col) isTRUE(all(abs(col - col[1]) < 1e-12)))))
+    warning("X has no constant/intercept column; include one (e.g. cbind(1, X)) ",
+            "so each regime has a baseline transition intercept.")
 
   # Parameter setup
   K <- ncol(residuals)
@@ -102,15 +109,15 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     lower = bounds$lower,
     upper = bounds$upper,
     control = list(
-      itermax = 500,
-      NP = 10 * length(bounds$lower),
+      itermax = con$itermax,
+      NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
       strategy = 2,
       F = 0.8,
       CR = 0.9,
       trace = con$do_trace,
-      parallelType = 0,
+      parallelType = con$parallelType,
       reltol = 1e-8,
-      steptol = 50
+      steptol = con$steptol
     ),
     y = y_optim,
     exog = X_optim,
@@ -129,7 +136,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     exog = X_optim,
     K = K,
     N = N,
-    control = list(maxit = 1000)
+    control = list(maxit = con$maxit)
   )
 
   # Parameter processing
@@ -210,6 +217,10 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     -rsdc_likelihood(optim_params, y = residuals_oos, exog = X_oos, K = K, N = N)
   else NULL
 
+  vcov <- if (isTRUE(con$compute_se))
+    .rsdc_vcov(optim_params, rsdc_likelihood, y = y_optim, exog = X_optim, K = K, N = N)
+  else NULL
+
   list(
     transition_matrix  = P,
     means              = matrix(0, N, K),
@@ -218,7 +229,12 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     covariances        = sigma_array,
     log_likelihood     = -result_optim$value,
     log_likelihood_oos = ll_oos,
-    beta               = beta
+    beta               = beta,
+    par                = optim_params,
+    vcov               = vcov,
+    convergence        = result_optim$convergence,
+    npar               = length(optim_params),
+    nobs               = nrow(y_optim)
   )
 }
 
@@ -280,10 +296,11 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' @importFrom stats optim
 #' @noRd
 f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
-  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
   stopifnot(is.matrix(residuals))
+  if (N < 2) stop("f_optim_noX requires N >= 2.")
 
-  con <- list(seed = 123, do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE, itermax = 500, NP = NULL,
+              parallelType = 0, steptol = 50, maxit = 1000, compute_se = TRUE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -316,9 +333,11 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     fn = rsdc_likelihood,
     lower = bounds$lower,
     upper = bounds$upper,
-    control = list(itermax = 500, NP = 10 * length(bounds$lower),
+    control = list(itermax = con$itermax,
+                   NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
                    strategy = 2, F = 0.8, CR = 0.9,
-                   trace = con$do_trace, reltol = 1e-8, steptol = 50),
+                   trace = con$do_trace, parallelType = con$parallelType,
+                   reltol = 1e-8, steptol = con$steptol),
     y = y_optim, exog = NULL, K = K, N = N
   )
 
@@ -329,7 +348,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     lower = bounds$lower,
     upper = bounds$upper,
     y = y_optim, exog = NULL, K = K, N = N,
-    control = list(maxit = 1000)
+    control = list(maxit = con$maxit)
   )
 
   final_par <- optim_result$par
@@ -369,24 +388,50 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     sigma_array[,,i] <- R
   }
 
-  # Build transition matrix
+  # Build transition matrix. N=2 keeps the diagonal-stay parameterisation
+  # (param i = p_ii); for N >= 3 the free entries fill the first N-1 columns and
+  # the last column is the row complement (generic for any N).
   trans_params <- final_par[1:n_trans]
   P <- matrix(0, N, N)
+  infeasible_row <- FALSE
   if (N == 2) {
     P[1, 1] <- trans_params[1]
     P[1, 2] <- 1 - trans_params[1]
     P[2, 1] <- 1 - trans_params[2]
     P[2, 2] <- trans_params[2]
-  } else if (N == 3) {
+  } else {
     for (i in 1:N) {
-      p_i1 <- trans_params[2L * (i - 1L) + 1L]
-      p_i2 <- trans_params[2L * (i - 1L) + 2L]
-      P[i, ] <- c(p_i1, p_i2, 1 - p_i1 - p_i2)
+      free <- trans_params[((i - 1L) * (N - 1L) + 1L):(i * (N - 1L))]
+      row  <- c(free, 1 - sum(free))
+      # A row can be infeasible (any entry < 0) when the optimiser has not reached
+      # a feasible simplex, or after the identifiability re-ordering re-references
+      # the free entries. Project onto the simplex (clamp negatives, renormalise)
+      # so a valid stochastic matrix is always returned, and flag non-convergence.
+      if (any(row < 0)) {
+        infeasible_row <- TRUE
+        row <- pmax(row, 0)
+        row <- row / sum(row)
+      }
+      P[i, ] <- row
     }
   }
+  if (infeasible_row)
+    warning("Transition matrix had an infeasible row (free probabilities summed > 1) ",
+            "and was projected onto the simplex; the optimiser may not have converged. ",
+            "Increase control$itermax or control$NP.")
+
+  # Warn when a free transition probability is pinned to its [0.01, 0.99] bound
+  # (degenerate / near-absorbing regime; SEs there are unreliable).
+  if (any(trans_params <= 0.01 + 1e-4 | trans_params >= trans_upper - 1e-4))
+    warning("A transition probability is at the [0.01, 0.99] bound; the regime is ",
+            "near-degenerate and its standard error may be unreliable.")
 
   ll_oos <- if (!is.null(y_oos))
     -rsdc_likelihood(final_par, y = y_oos, exog = NULL, K = K, N = N)
+  else NULL
+
+  vcov <- if (isTRUE(con$compute_se))
+    .rsdc_vcov(final_par, rsdc_likelihood, y = y_optim, exog = NULL, K = K, N = N)
   else NULL
 
   list(
@@ -397,7 +442,12 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     covariances        = sigma_array,
     log_likelihood     = -optim_result$value,
     log_likelihood_oos = ll_oos,
-    beta               = NULL
+    beta               = NULL,
+    par                = final_par,
+    vcov               = vcov,
+    convergence        = optim_result$convergence,
+    npar               = length(final_par),
+    nobs               = nrow(y_optim)
   )
 }
 
@@ -458,7 +508,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
-  con <- list(seed = 123, do_trace = FALSE)
+  con <- list(seed = 123, do_trace = FALSE, itermax = 500, maxit = 1000,
+              compute_se = TRUE)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -496,7 +547,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     fn = neg_loglik_const,
     lower = rep(-1, n_rho),
     upper = rep(1, n_rho),
-    control = list(itermax = 500, trace = con$do_trace),
+    control = list(itermax = con$itermax, trace = con$do_trace),
     y = y_is, K = K
   )
 
@@ -507,7 +558,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     lower = rep(-1, n_rho),
     upper = rep(1, n_rho),
     y = y_is, K = K,
-    control = list(maxit = 1000)
+    control = list(maxit = con$maxit)
   )
 
   rho_vec <- optim_result$par
@@ -524,6 +575,10 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     -neg_loglik_const(rho_vec, y = y_oos, K = K)
   else NULL
 
+  vcov <- if (isTRUE(con$compute_se))
+    .rsdc_vcov(rho_vec, neg_loglik_const, y = y_is, K = K)
+  else NULL
+
   list(
     transition_matrix  = matrix(1, 1, 1),
     means              = matrix(0, 1, K),
@@ -532,7 +587,12 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     covariances        = array_R,
     log_likelihood     = ll_return,
     log_likelihood_oos = ll_oos,
-    beta               = NULL
+    beta               = NULL,
+    par                = rho_vec,
+    vcov               = vcov,
+    convergence        = optim_result$convergence,
+    npar               = length(rho_vec),
+    nobs               = nrow(y_is)
   )
 }
 
@@ -550,17 +610,32 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
 #' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
-#' @param control Optional list. Currently forwards \code{do_trace = FALSE} and \code{seed = 123} to the backends.
+#' @param control Optional list forwarded to the backends and optimisers:
+#'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimiser
+#'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
+#'   and \code{maxit} (\code{optim}); and \code{compute_se} (default \code{TRUE}) to
+#'   toggle the observed-information standard errors.
 #'
-#' @return
+#' @return An object of class \code{"rsdc_fit"}: a list with components
 #' \describe{
-#'   \item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"}).}
-#'   \item{\code{correlations}}{Regime lower-triangular correlations.}
-#'   \item{\code{covariances}}{Array of full correlation matrices.}
+#'   \item{\code{transition_matrix}}{Estimated transition matrix (\eqn{1 \times 1} for \code{"const"};
+#'     for \code{"tvtp"}, evaluated at the in-sample covariate means).}
+#'   \item{\code{correlations}}{Regime lower-triangular correlations (rows ordered by ascending mean).}
+#'   \item{\code{covariances}}{Array \eqn{K \times K \times N} of regime correlation matrices.}
 #'   \item{\code{log_likelihood}}{In-sample log-likelihood; full-sample when \code{out_of_sample = FALSE}.}
-#'   \item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30%, or \code{NULL} when \code{out_of_sample = FALSE}.}
-#'   \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}).}
+#'   \item{\code{log_likelihood_oos}}{OOS log-likelihood on held-out 30\%, or \code{NULL}.}
+#'   \item{\code{beta}}{TVTP coefficients (only for \code{"tvtp"}; \code{NULL} otherwise).}
+#'   \item{\code{par}, \code{coefficients}}{Named vector of estimated parameters in objective order.}
+#'   \item{\code{vcov}}{Observed-information variance-covariance at the MLE, or \code{NULL} if
+#'     the Hessian is singular/unavailable (e.g. at a bound).}
+#'   \item{\code{se}}{Named standard errors (\code{sqrt(diag(vcov))}), or \code{NULL}.}
+#'   \item{\code{convergence}}{\code{optim} convergence code (0 = converged).}
+#'   \item{\code{npar}, \code{nobs}}{Number of free parameters and observations used in estimation.}
+#'   \item{\code{method}, \code{N}, \code{K}, \code{p}, \code{call}}{Fit metadata.}
 #' }
+#' Standard methods are provided: \code{\link[=print.rsdc_fit]{print}}, \code{summary},
+#' \code{coef}, \code{logLik} (so \code{\link[stats]{AIC}}/\code{\link[stats]{BIC}} work),
+#' \code{nobs}, \code{vcov}, \code{confint}, \code{predict}, and \code{simulate}.
 #'
 #' @details
 #' \itemize{
@@ -579,10 +654,13 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @examples
 #' \donttest{
 #' y <- scale(matrix(rnorm(100 * 3), 100, 3))
-#' rsdc_estimate("const", residuals = y)
-#' rsdc_estimate("noX", residuals = y, N = 2)
+#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#' print(fit)
+#' summary(fit)
+#' c(AIC = AIC(fit), BIC = BIC(fit))
 #' X <- cbind(1, scale(seq_len(nrow(y))))
-#' rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+#' fit_tvtp <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+#' coef(fit_tvtp)
 #' }
 #'
 #' @seealso \code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
@@ -603,22 +681,22 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
               "inputs as standardized. Consider scale() so only the correlation structure is fit.")
   }
 
-  con <- list(seed = 123, do_trace = FALSE)
-  con[names(control)] <- control
+  cl <- match.call()
+  p_x <- if (!is.null(X)) ncol(X) else NA_integer_
 
   if (method == "tvtp") {
     if (is.null(X)) stop("X must be provided for method = 'tvtp'")
-    return(f_optim(N = N, residuals = residuals, X = X, out_of_sample = out_of_sample, control = list(seed = con$seed, do_trace = con$do_trace)))
+    fit <- f_optim(N = N, residuals = residuals, X = X,
+                   out_of_sample = out_of_sample, control = control)
+  } else if (method == "noX") {
+    fit <- f_optim_noX(N = N, residuals = residuals,
+                       out_of_sample = out_of_sample, control = control)
+  } else if (method == "const") {
+    fit <- f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
+                         control = control)
+  } else {
+    stop("Unknown method: ", method)
   }
 
-  if (method == "noX") {
-    return(f_optim_noX(N = N, residuals = residuals, out_of_sample = out_of_sample, control = list(seed = con$seed, do_trace = con$do_trace)))
-  }
-
-  if (method == "const") {
-    return(f_optim_const(residuals = residuals, out_of_sample = out_of_sample,
-                         control = list(seed = con$seed, do_trace = con$do_trace)))
-  }
-
-  stop("Unknown method: ", method)
+  .rsdc_finalize(fit, method = method, N = N, K = ncol(residuals), p = p_x, call = cl)
 }

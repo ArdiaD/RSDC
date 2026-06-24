@@ -1,10 +1,12 @@
-# Build the packaged dataset "greenbrown" from the Excel in inst/extdata
+# Build the packaged dataset "greenbrown" from the source Excel.
+# The workbook lives in data-raw/ (build-ignored, not shipped on CRAN); run this
+# script from the package root.
 
 # Only needed for building the data:
 if (!requireNamespace("readxl", quietly = TRUE))
   stop("Package 'readxl' is required to rebuild this dataset. Install it with: install.packages(\"readxl\")")
 
-file <- system.file("extdata", "green-brown-ptf.xlsx", package = "RSDC")
+file <- "data-raw/green-brown-ptf.xlsx"
 
 greenbrown <- readxl::read_excel(file)
 

@@ -1,0 +1,103 @@
+---
+title: "Getting started with RSDC"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with RSDC}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 3.4,
+                      message = FALSE, warning = FALSE)
+options(digits = 4)
+```
+
+```{r setup}
+library(RSDC)
+```
+
+This vignette walks through the package API: estimating the three model
+variants, using the standard S3 methods on a fitted object, comparing models with
+`AIC`/`BIC`, forecasting, and simulating. To keep the build fast we use a small
+simulated data set and a reduced optimiser budget via `control`; in real use, keep
+the defaults.
+
+## A fitted object is an `"rsdc_fit"`
+
+```{r data}
+set.seed(1)
+n  <- 300L
+X  <- cbind(intercept = 1, z = as.numeric(scale(seq_len(n))))   # include an intercept
+beta <- rbind(c(1.5, -0.6),     # regime 1 (logistic stay-prob coefficients)
+              c(1.0,  0.2))     # regime 2
+rho  <- rbind(0.2, 0.8)         # K = 2 -> one correlation per regime
+Sig  <- array(c(matrix(c(1, 0.2, 0.2, 1), 2),
+                matrix(c(1, 0.8, 0.8, 1), 2)), dim = c(2, 2, 2))
+sim  <- rsdc_simulate(n = n, X = X, beta = beta, mu = matrix(0, 2, 2),
+                      sigma = Sig, N = 2, seed = 42)
+y <- scale(sim$observations)    # treated as unit-variance standardized residuals
+
+ctrl <- list(itermax = 30, NP = 40, seed = 1)   # small budget for the vignette
+fit <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X, control = ctrl)
+class(fit)
+fit
+```
+
+## Standard methods
+
+`AIC()` / `BIC()` work directly because `logLik()` carries `df` and `nobs`:
+
+```{r methods}
+logLik(fit)
+c(AIC = AIC(fit), BIC = BIC(fit), nobs = nobs(fit))
+coef(fit)
+```
+
+`summary()` reports a coefficient table with standard errors (from the observed
+information at the MLE), and `confint()` gives Wald intervals:
+
+```{r summary}
+summary(fit)
+head(confint(fit))
+```
+
+## Model comparison
+
+```{r compare}
+fit_const <- rsdc_estimate("const", residuals = y, control = ctrl)
+fit_noX   <- rsdc_estimate("noX",   residuals = y, N = 2, control = ctrl)
+data.frame(
+  model = c("const", "noX(N=2)", "tvtp(N=2)"),
+  AIC   = c(AIC(fit_const), AIC(fit_noX), AIC(fit)),
+  BIC   = c(BIC(fit_const), BIC(fit_noX), BIC(fit))
+)
+```
+
+## Forecasting and simulation
+
+`predict()` wraps `rsdc_forecast()`; supply the conditional volatilities:
+
+```{r predict}
+sigma_mat <- matrix(1, n, 2, dimnames = list(NULL, c("a", "b")))   # unit vols here
+fc <- predict(fit, residuals = y, sigma_matrix = sigma_mat,
+              value_cols = c("a", "b"), X = X)
+str(fc$predicted_correlations)
+```
+
+`simulate()` draws a new path from the fitted model (here, TVTP given `X`):
+
+```{r simulate}
+sim2 <- simulate(fit, X = X, seed = 7)
+table(sim2$states)
+```
+
+## More than three regimes
+
+`N >= 4` is supported for `"noX"` and `"tvtp"`:
+
+```{r bign}
+fit4 <- rsdc_estimate("noX", residuals = y, N = 4,
+                      control = list(itermax = 20, NP = 60, seed = 1))
+dim(fit4$transition_matrix)
+```

@@ -322,7 +322,6 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
 #'
 #' @export
 rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
-  if (N > 3) stop("Only N = 2 or N = 3 is supported.")
   if (any(is.na(params)) || any(!is.finite(params))) return(1e10)
 
   # Parameter count calculation
@@ -340,20 +339,21 @@ rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
     rho_matrix <- matrix(params[(n_p + 1):(n_p + n_rho)], nrow = N, byrow = TRUE)
     beta <- NULL
 
-    # Build transition matrix
+    # Build transition matrix. N=2 keeps the diagonal-stay parameterisation;
+    # for N >= 3 the free entries fill the first N-1 columns and the last column
+    # is the row complement (generic for any N).
     P <- matrix(0, N, N)
     if (N == 2) {
       if (any(trans_params < 0 | trans_params > 1)) return(1e10)
       P <- matrix(c(trans_params[1], 1 - trans_params[1],
                     1 - trans_params[2], trans_params[2]),
                   nrow = N, byrow = TRUE)
-    } else if (N == 3) {
+    } else {
       for (i in 1:N) {
-        p_i1 <- trans_params[2L * (i - 1L) + 1L]
-        p_i2 <- trans_params[2L * (i - 1L) + 2L]
-        p_i3 <- 1 - p_i1 - p_i2
-        if (p_i1 < 0 || p_i2 < 0 || p_i3 < 0) return(1e10)
-        P[i, ] <- c(p_i1, p_i2, p_i3)
+        free <- trans_params[((i - 1L) * (N - 1L) + 1L):(i * (N - 1L))]
+        last <- 1 - sum(free)
+        if (any(free < 0) || last < 0) return(1e10)
+        P[i, ] <- c(free, last)
       }
     }
   } else {

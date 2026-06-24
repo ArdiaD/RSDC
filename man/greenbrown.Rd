@@ -13,7 +13,8 @@ A data frame with 2266 rows and three columns:
 }
 }
 \source{
-Originally data in \code{inst/extdata/green-brown-ptf.xlsx}.
+Built from the source workbook in \code{data-raw/green-brown-ptf.xlsx}
+(not shipped on CRAN); see \code{data-raw/greenbrown.R}.
 }
 \usage{
 data(greenbrown)

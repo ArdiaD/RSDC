@@ -1,0 +1,243 @@
+# S3 class "rsdc_fit": constructor, inference helpers, and standard methods.
+# Added in 1.3-0 (P1 class/methods, P2 standard errors, P3 simulate method).
+
+# ---- internal helpers -------------------------------------------------------
+
+#' Observed-information variance-covariance at the MLE
+#'
+#' Numerically differentiates the negative log-likelihood at the final parameter
+#' vector with \code{stats::optimHess} and inverts it. Returns \code{NULL} (rather
+#' than erroring) when the Hessian is unavailable or singular, e.g. at a bound.
+#'
+#' @param par Numeric vector of final (reordered) parameters in the objective's layout.
+#' @param fn Objective returning the \emph{negative} log-likelihood.
+#' @param ... Passed to \code{fn}.
+#' @return A variance-covariance matrix, or \code{NULL}.
+#' @importFrom stats optimHess
+#' @noRd
+.rsdc_vcov <- function(par, fn, ...) {
+  H <- tryCatch(stats::optimHess(par, fn, ...), error = function(e) NULL)
+  if (is.null(H) || any(!is.finite(H))) return(NULL)
+  V <- tryCatch(solve(H), error = function(e) NULL)
+  if (is.null(V) || any(!is.finite(V))) return(NULL)
+  V
+}
+
+#' Parameter labels matching the objective's packing order
+#' @noRd
+.rsdc_labels <- function(method, N, K, p) {
+  pairs <- utils::combn(K, 2)
+  pair_tag <- apply(pairs, 2, function(z) paste0(z[1], z[2]))
+  n_reg <- if (method == "const") 1L else N
+  rho_labels <- unlist(lapply(seq_len(n_reg), function(i)
+    paste0("rho[g", i, ",", pair_tag, "]")))
+
+  if (method == "const") return(rho_labels)
+
+  if (method == "noX") {
+    trans_labels <- unlist(lapply(seq_len(N), function(i) {
+      if (N == 2L) paste0("p[g", i, ",stay]")
+      else paste0("p[g", i, ",to", seq_len(N - 1L), "]")
+    }))
+    return(c(trans_labels, rho_labels))
+  }
+
+  # tvtp
+  beta_labels <- unlist(lapply(seq_len(N), function(i) {
+    if (N == 2L) paste0("b[g", i, ",x", seq_len(p), "]")
+    else as.vector(t(outer(seq_len(N - 1L), seq_len(p),
+                           function(k, x) paste0("b[g", i, ",c", k, ",x", x, "]"))))
+  }))
+  c(beta_labels, rho_labels)
+}
+
+#' Attach metadata, names, standard errors, and class to a backend fit
+#' @noRd
+.rsdc_finalize <- function(fit, method, N, K, p, call) {
+  fit$method <- method
+  fit$N      <- if (method == "const") 1L else as.integer(N)
+  fit$K      <- as.integer(K)
+  fit$p      <- if (method == "tvtp") as.integer(p) else NA_integer_
+  fit$call   <- call
+
+  labs <- .rsdc_labels(method, fit$N, K, p)
+  if (!is.null(fit$par) && length(fit$par) == length(labs)) {
+    names(fit$par) <- labs
+    fit$coefficients <- fit$par
+  } else {
+    fit$coefficients <- fit$par
+  }
+
+  if (!is.null(fit$vcov) && all(dim(fit$vcov) == length(labs))) {
+    dimnames(fit$vcov) <- list(labs, labs)
+    se <- sqrt(pmax(diag(fit$vcov), NA_real_))
+    names(se) <- labs
+    fit$se <- se
+  } else {
+    fit$vcov <- NULL
+    fit$se   <- NULL
+  }
+
+  class(fit) <- "rsdc_fit"
+  fit
+}
+
+# ---- methods ---------------------------------------------------------------
+
+#' @describeIn rsdc_estimate Compact printer for a fitted model.
+#' @param x An object of class \code{"rsdc_fit"}.
+#' @param digits Number of significant digits for printing.
+#' @param ... Further arguments passed to methods (currently unused).
+#' @exportS3Method print rsdc_fit
+print.rsdc_fit <- function(x, digits = 4, ...) {
+  cat(sprintf("RSDC fit: method = \"%s\", N = %d regime(s), K = %d series, T = %d\n",
+              x$method, x$N, x$K, if (is.null(x$nobs)) NA_integer_ else x$nobs))
+  if (!is.null(x$call)) { cat("Call: "); print(x$call) }
+  cat(sprintf("logLik = %.3f", x$log_likelihood))
+  if (!is.null(x$npar)) cat(sprintf("   npar = %d   AIC = %.2f   BIC = %.2f",
+                                    x$npar, stats::AIC(x), stats::BIC(x)))
+  cat("\n\nRegime correlations (rows = regimes, ascending mean):\n")
+  print(round(x$correlations, digits))
+  if (x$method != "const") {
+    cat("\nTransition matrix (at mean covariate for tvtp):\n")
+    print(round(x$transition_matrix, digits))
+  }
+  if (!is.null(x$convergence))
+    cat(sprintf("\nOptimiser convergence code: %d (0 = converged)\n", x$convergence))
+  if (is.null(x$se))
+    cat("Standard errors: not available (singular/unavailable Hessian).\n")
+  invisible(x)
+}
+
+#' @describeIn rsdc_estimate Coefficient vector (named, in objective order).
+#' @exportS3Method coef rsdc_fit
+coef.rsdc_fit <- function(object, ...) object$coefficients
+
+#' @describeIn rsdc_estimate Number of observations used in estimation.
+#' @exportS3Method nobs rsdc_fit
+nobs.rsdc_fit <- function(object, ...) object$nobs
+
+#' @describeIn rsdc_estimate Log-likelihood (carries \code{df} and \code{nobs} so
+#'   \code{stats::AIC}/\code{BIC} work out of the box).
+#' @exportS3Method logLik rsdc_fit
+logLik.rsdc_fit <- function(object, ...) {
+  val <- object$log_likelihood
+  attr(val, "df")    <- object$npar
+  attr(val, "nobs")  <- object$nobs
+  class(val) <- "logLik"
+  val
+}
+
+#' @describeIn rsdc_estimate Variance-covariance matrix of the estimates.
+#' @exportS3Method vcov rsdc_fit
+vcov.rsdc_fit <- function(object, ...) {
+  if (is.null(object$vcov))
+    stop("No variance-covariance available (Hessian singular/unavailable). ",
+         "Refit with control = list(compute_se = TRUE) at an interior optimum.")
+  object$vcov
+}
+
+#' @describeIn rsdc_estimate Wald confidence intervals from the observed information.
+#' @param parm Vector of parameter names/indices (default: all).
+#' @param level Confidence level.
+#' @exportS3Method confint rsdc_fit
+#' @importFrom stats qnorm
+confint.rsdc_fit <- function(object, parm, level = 0.95, ...) {
+  cf <- coef(object); V <- vcov(object)
+  ses <- sqrt(diag(V))
+  if (missing(parm)) parm <- names(cf)
+  a <- (1 - level) / 2
+  fac <- stats::qnorm(c(a, 1 - a))
+  ci <- cf[parm] + outer(ses[parm], fac)
+  colnames(ci) <- paste0(format(100 * c(a, 1 - a), trim = TRUE), "%")
+  rownames(ci) <- parm
+  ci
+}
+
+#' @describeIn rsdc_estimate Summary with a coefficient table (estimate, SE, z, p).
+#' @exportS3Method summary rsdc_fit
+#' @importFrom stats pnorm
+summary.rsdc_fit <- function(object, ...) {
+  cf <- coef(object)
+  tab <- NULL
+  if (!is.null(object$se)) {
+    se <- object$se[names(cf)]
+    z  <- cf / se
+    pv <- 2 * stats::pnorm(-abs(z))
+    tab <- cbind(Estimate = cf, `Std. Error` = se, `z value` = z, `Pr(>|z|)` = pv)
+  }
+  out <- list(call = object$call, method = object$method, N = object$N, K = object$K,
+              nobs = object$nobs, npar = object$npar,
+              logLik = object$log_likelihood,
+              AIC = stats::AIC(object), BIC = stats::BIC(object),
+              coefficients = tab, correlations = object$correlations,
+              transition_matrix = object$transition_matrix, convergence = object$convergence)
+  class(out) <- "summary.rsdc_fit"
+  out
+}
+
+#' @exportS3Method print summary.rsdc_fit
+#' @importFrom stats printCoefmat
+print.summary.rsdc_fit <- function(x, digits = 4, ...) {
+  cat(sprintf("RSDC fit summary: method = \"%s\", N = %d, K = %d, T = %s\n",
+              x$method, x$N, x$K, ifelse(is.null(x$nobs), "NA", x$nobs)))
+  cat(sprintf("logLik = %.3f   npar = %s   AIC = %.2f   BIC = %.2f\n\n",
+              x$logLik, ifelse(is.null(x$npar), "NA", x$npar), x$AIC, x$BIC))
+  if (!is.null(x$coefficients)) {
+    cat("Coefficients:\n")
+    stats::printCoefmat(x$coefficients, digits = digits, has.Pvalue = TRUE)
+  } else {
+    cat("Coefficients: standard errors unavailable (singular Hessian).\n")
+    cat("Regime correlations:\n")
+    print(round(x$correlations, digits))
+  }
+  invisible(x)
+}
+
+#' @describeIn rsdc_estimate Forecast from a fitted model (wraps
+#'   \code{\link{rsdc_forecast}}); supply the residuals, conditional volatilities,
+#'   and (for \code{"tvtp"}) the covariate matrix \code{X}.
+#' @param residuals Numeric matrix of standardized residuals for the forecast.
+#' @param sigma_matrix Numeric matrix of conditional standard deviations.
+#' @param value_cols Columns of \code{sigma_matrix} giving the asset order.
+#' @param X Covariate matrix (required for \code{method = "tvtp"}).
+#' @param out_of_sample Logical; passed to \code{\link{rsdc_forecast}}.
+#' @exportS3Method predict rsdc_fit
+predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
+                             X = NULL, out_of_sample = FALSE, ...) {
+  rsdc_forecast(method = object$method, N = object$N, residuals = residuals,
+                X = X, final_params = object, sigma_matrix = sigma_matrix,
+                value_cols = value_cols, out_of_sample = out_of_sample, ...)
+}
+
+#' @describeIn rsdc_estimate Simulate from a fitted model. For \code{"tvtp"} supply
+#'   a covariate matrix \code{X} (its row count sets the length); for \code{"noX"}
+#'   the fixed transition matrix is used; for \code{"const"} a single regime is drawn.
+#' @param nsim Unused (kept for generic compatibility; one path is returned).
+#' @param seed Optional RNG seed.
+#' @param n Series length for \code{"noX"}/\code{"const"} (defaults to the fitted T).
+#' @exportS3Method simulate rsdc_fit
+simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL, ...) {
+  if (!requireNamespace("mvtnorm", quietly = TRUE)) stop("Please install 'mvtnorm'.")
+  if (!is.null(seed)) set.seed(seed)
+  N <- object$N; K <- object$K
+  sigma <- object$covariances
+  mu <- matrix(0, max(N, 1L), K)
+
+  if (object$method == "tvtp") {
+    if (is.null(X)) stop("simulate(): provide X (n x p) for a 'tvtp' fit.")
+    return(rsdc_simulate(n = nrow(X), X = X, beta = object$beta,
+                         mu = mu, sigma = sigma, N = N, seed = NULL))
+  }
+
+  n_ <- if (!is.null(n)) as.integer(n) else if (!is.null(object$nobs)) object$nobs else 500L
+  P <- object$transition_matrix
+  states <- integer(n_); obs <- matrix(NA_real_, n_, K)
+  states[1] <- if (object$method == "noX") sample.int(N, 1) else 1L
+  obs[1, ] <- mvtnorm::rmvnorm(1, mu[states[1], ], sigma[, , states[1]])
+  if (n_ > 1L) for (t in 2:n_) {
+    states[t] <- if (object$method == "noX") sample.int(N, 1, prob = P[states[t - 1L], ]) else 1L
+    obs[t, ] <- mvtnorm::rmvnorm(1, mu[states[t], ], sigma[, , states[t]])
+  }
+  list(states = states, observations = obs, transition_matrices = NULL)
+}
