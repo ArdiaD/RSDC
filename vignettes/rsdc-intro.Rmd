@@ -106,6 +106,62 @@ nrow(fc_oos$predicted_correlations)   # length of the 30% hold-out
 fc_oos$BIC                            # out-of-sample predictive score
 ```
 
+## Uncertainty, decoding, multi-step forecasts, and tidy output
+
+The following tools were added in version 1.5-0.
+
+**Multi-start estimation.** `control$n_starts` re-runs the global + local search
+from several seeds and keeps the highest-likelihood fit, storing each start's
+log-likelihood so you can judge whether the optimum is stable (a guard against
+local optima):
+
+```{r multistart}
+fit_ms <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X,
+                        control = c(ctrl, list(n_starts = 3)))
+fit_ms$start_logliks            # one log-likelihood per start
+```
+
+**Uncertainty bands on the predicted correlation.** `rsdc_corr_bands()` draws
+parameter vectors from the fitted sampling distribution, re-runs the filter for
+each, and returns pointwise quantile bands (one matrix per asset pair, with
+columns `fit`, `lower`, `upper`):
+
+```{r bands}
+bands <- rsdc_corr_bands(fit, B = 100, seed = 1)
+head(bands[[1]])
+```
+
+**Most likely regime path (Viterbi).** `rsdc_viterbi()` returns the single most
+likely *joint* regime sequence, complementing the marginal smoothed
+probabilities:
+
+```{r viterbi}
+table(rsdc_viterbi(fit))
+```
+
+**Multi-step-ahead forecasts.** `rsdc_forecast_ahead()` propagates the terminal
+filtered state through the Markov chain to forecast the regime distribution and
+the implied correlations `h` steps ahead (pass `X_future` for the time-varying
+case; here the last covariate row is held constant):
+
+```{r ahead}
+fa <- rsdc_forecast_ahead(fit, horizon = 5)
+fa$predicted_correlations
+```
+
+**Tidy output and plotting.** `rsdc_fit` objects work with the \pkg{broom}
+generics `tidy()` / `glance()` / `augment()` and a \pkg{ggplot2} `autoplot()`
+method:
+
+```{r broom}
+generics::tidy(fit)
+generics::glance(fit)
+```
+
+```{r autoplot, eval = requireNamespace("ggplot2", quietly = TRUE), fig.alt = "Stacked smoothed regime probabilities over time"}
+ggplot2::autoplot(fit)          # stacked smoothed regime probabilities
+```
+
 ## More than three regimes
 
 `N >= 4` is supported for `"noX"` and `"tvtp"`:

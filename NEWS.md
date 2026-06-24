@@ -11,6 +11,9 @@
 - `rsdc_viterbi()`: most likely (MAP) regime path via the Viterbi algorithm.
 - broom tidiers `tidy()`, `glance()`, `augment()` and a `ggplot2::autoplot()`
   method for `rsdc_fit` (ggplot2 is a soft dependency in `Suggests`).
+- Documentation: the "Getting started" vignette gains a section demonstrating the
+  new features above (multi-start, bands, Viterbi, multi-step forecasts, tidy
+  output), and the broom/autoplot methods gain runnable examples.
 
 # Changes in Version 1.4-0 (DA,BS,RN)
 - Performance: the Hamilton-filter log-likelihood used during estimation is now

@@ -20,3 +20,10 @@ A data frame with one row per observation: the residual columns
 \pkg{broom}-style augmentation: returns the estimation residuals together with
 the smoothed regime probabilities and the most likely (Viterbi) regime path.
 }
+\examples{
+\donttest{
+y <- scale(matrix(rnorm(200 * 2), 200, 2))
+fit <- rsdc_estimate("noX", residuals = y, N = 2)
+head(generics::augment(fit))
+}
+}

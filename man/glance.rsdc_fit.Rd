@@ -18,3 +18,10 @@ A one-row data frame with \code{method}, \code{n_regimes},
 \description{
 \pkg{broom}-style one-row model summary.
 }
+\examples{
+\donttest{
+y <- scale(matrix(rnorm(200 * 2), 200, 2))
+fit <- rsdc_estimate("noX", residuals = y, N = 2)
+generics::glance(fit)
+}
+}

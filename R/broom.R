@@ -11,6 +11,12 @@ utils::globalVariables(c("time", "prob", "regime"))
 #' @param ... Unused; for generic compatibility.
 #' @returns A data frame with columns \code{term}, \code{estimate},
 #'   \code{std.error}, \code{statistic} and \code{p.value}.
+#' @examples
+#' \donttest{
+#' y <- scale(matrix(rnorm(200 * 2), 200, 2))
+#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#' generics::tidy(fit)
+#' }
 #' @importFrom stats coef pnorm
 #' @importFrom generics tidy glance augment
 #' @exportS3Method generics::tidy
@@ -32,6 +38,12 @@ tidy.rsdc_fit <- function(x, ...) {
 #' @param ... Unused; for generic compatibility.
 #' @returns A one-row data frame with \code{method}, \code{n_regimes},
 #'   \code{logLik}, \code{AIC}, \code{BIC}, \code{df} and \code{nobs}.
+#' @examples
+#' \donttest{
+#' y <- scale(matrix(rnorm(200 * 2), 200, 2))
+#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#' generics::glance(fit)
+#' }
 #' @importFrom stats logLik AIC BIC nobs
 #' @exportS3Method generics::glance
 glance.rsdc_fit <- function(x, ...) {
@@ -51,6 +63,12 @@ glance.rsdc_fit <- function(x, ...) {
 #' @returns A data frame with one row per observation: the residual columns
 #'   (\code{.resid1}, ...), smoothed regime probabilities
 #'   (\code{.smoothed_p1}, ...) and the Viterbi state \code{.state}.
+#' @examples
+#' \donttest{
+#' y <- scale(matrix(rnorm(200 * 2), 200, 2))
+#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#' head(generics::augment(fit))
+#' }
 #' @exportS3Method generics::augment
 augment.rsdc_fit <- function(x, ...) {
   res <- x$residuals
@@ -82,6 +100,14 @@ augment.rsdc_fit <- function(x, ...) {
 #' @param object An \code{"rsdc_fit"} object.
 #' @param ... Unused; for generic compatibility.
 #' @returns A \code{ggplot} object.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("ggplot2", quietly = TRUE)) {
+#'   y <- scale(matrix(rnorm(200 * 2), 200, 2))
+#'   fit <- rsdc_estimate("noX", residuals = y, N = 2)
+#'   ggplot2::autoplot(fit)
+#' }
+#' }
 #' @exportS3Method ggplot2::autoplot
 autoplot.rsdc_fit <- function(object, ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE))

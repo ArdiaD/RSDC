@@ -18,3 +18,10 @@ A data frame with columns \code{term}, \code{estimate},
 \description{
 \pkg{broom}-style tidier returning a one-row-per-parameter coefficient table.
 }
+\examples{
+\donttest{
+y <- scale(matrix(rnorm(200 * 2), 200, 2))
+fit <- rsdc_estimate("noX", residuals = y, N = 2)
+generics::tidy(fit)
+}
+}

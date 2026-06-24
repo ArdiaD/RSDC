@@ -18,3 +18,12 @@ A \code{ggplot} object.
 Plots the smoothed regime probabilities over the sample as stacked areas.
 Requires the suggested \pkg{ggplot2} package.
 }
+\examples{
+\donttest{
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  y <- scale(matrix(rnorm(200 * 2), 200, 2))
+  fit <- rsdc_estimate("noX", residuals = y, N = 2)
+  ggplot2::autoplot(fit)
+}
+}
+}
