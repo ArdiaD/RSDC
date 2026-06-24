@@ -68,22 +68,24 @@ allocation \(w_i = 1/K\).
 }
 }
 \examples{
-# Toy example with K = 3
-T <- 50; K <- 3
-set.seed(42)
-vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
-colnames(vols) <- paste0("A", 1:K)
-# simple, stationary correlations
-pred_corr <- cbind(rep(0.20, T), rep(0.10, T), rep(0.05, T))  # order: (2,1), (3,1), (3,2)
-rets <- matrix(rnorm(T*K, sd = 0.01), T, K); colnames(rets) <- colnames(vols)
+# Toy example with K = 3 (requires the suggested 'quadprog' package)
+if (requireNamespace("quadprog", quietly = TRUE)) {
+  T <- 50; K <- 3
+  set.seed(42)
+  vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
+  colnames(vols) <- paste0("A", 1:K)
+  # simple, stationary correlations
+  pred_corr <- cbind(rep(0.20, T), rep(0.10, T), rep(0.05, T))  # order: (2,1), (3,1), (3,2)
+  rets <- matrix(rnorm(T*K, sd = 0.01), T, K); colnames(rets) <- colnames(vols)
 
-mv <- rsdc_minvar(sigma_matrix  = vols,
-                  value_cols    = colnames(vols),
-                  predicted_corr= pred_corr,
-                  y             = rets,
-                  long_only     = TRUE)
-head(mv$weights)
-mv$volatility
+  mv <- rsdc_minvar(sigma_matrix  = vols,
+                    value_cols    = colnames(vols),
+                    predicted_corr= pred_corr,
+                    y             = rets,
+                    long_only     = TRUE)
+  head(mv$weights)
+  mv$volatility
+}
 
 }
 \seealso{

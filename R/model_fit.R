@@ -104,6 +104,9 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
   if (any(!is.finite(y))) stop("y must not contain NA/NaN/Inf values.")
   if (!is.null(X) && !is.matrix(X)) stop("X must be a numeric matrix or NULL.")
   if (!is.null(X) && any(!is.finite(X))) stop("X must not contain NA/NaN/Inf values.")
+  if (!is.null(X) && nrow(X) != nrow(y))
+    stop(sprintf("X must have the same number of rows as y (nrow(X) = %d, nrow(y) = %d).",
+                 nrow(X), nrow(y)))
   # TVTP needs both X and beta; supplying only one silently fell back to a fixed P.
   if (xor(is.null(X), is.null(beta)))
     stop("For time-varying transitions supply both X and beta; supply neither for a ",
@@ -118,8 +121,12 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
   if (!is.matrix(rho_matrix) || nrow(rho_matrix) != N || ncol(rho_matrix) != K*(K - 1)/2) {
     stop("rho_matrix must be of dimension N x (K*(K-1)/2).")
   }
-  if (!is.null(P) && (!is.matrix(P) || !all(dim(P) == c(N, N)))) {
-    stop("P must be an N x N matrix if provided.")
+  if (!is.null(P)) {
+    if (!is.matrix(P) || !all(dim(P) == c(N, N)))
+      stop("P must be an N x N matrix if provided.")
+    if (any(!is.finite(P)) || any(P < 0) || any(abs(rowSums(P) - 1) > 1e-8))
+      stop("P must be a valid row-stochastic matrix (finite, non-negative entries, ",
+           "rows summing to 1).")
   }
   if (!is.null(xi_init) && (length(xi_init) != N || any(!is.finite(xi_init)) ||
                             any(xi_init < 0) || sum(xi_init) <= 0)) {
@@ -365,6 +372,7 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
 #'
 #' @export
 rsdc_likelihood <- function(params, y, exog = NULL, K, N) {
+  if (K < 2L) return(1e10)  # correlation model is undefined for a single series
   if (any(is.na(params)) || any(!is.finite(params))) return(1e10)
 
   # Parameter count calculation

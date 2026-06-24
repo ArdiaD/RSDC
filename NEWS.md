@@ -19,6 +19,19 @@
   probabilities).
 - Fitted objects now store the estimation residuals/covariates and the
   filtered/smoothed regime probabilities.
+- Input-validation hardening (audit): `rsdc_estimate()`/`rsdc_hamilton()` now
+  reject single-series input (`K < 2`) and a covariate matrix `X` whose row
+  count does not match the data; `rsdc_hamilton()` validates that a user-supplied
+  fixed transition matrix `P` is row-stochastic (finite, non-negative, rows
+  summing to 1).
+- `confint()` now uses the same safe square-root as `summary()`, so non-positive
+  variance estimates map to `NA` instead of producing inconsistent `NaN`
+  intervals.
+- For the fixed-transition `noX` model with `N >= 3`, a transition row that the
+  optimiser leaves infeasible (free probabilities summing above 1) is still
+  projected onto the simplex, but the fit is now flagged as non-converged and its
+  standard errors are suppressed (the projected point is not a valid basis for
+  inference).
 
 # Changes in Version 1.3-0 (DA,BS,RN)
 - `rsdc_estimate()` now returns an object of class `"rsdc_fit"` with standard S3

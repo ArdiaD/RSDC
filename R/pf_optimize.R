@@ -47,22 +47,24 @@
 #' }
 #'
 #' @examples
-#' # Toy example with K = 3
-#' T <- 50; K <- 3
-#' set.seed(42)
-#' vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
-#' colnames(vols) <- paste0("A", 1:K)
-#' # simple, stationary correlations
-#' pred_corr <- cbind(rep(0.20, T), rep(0.10, T), rep(0.05, T))  # order: (2,1), (3,1), (3,2)
-#' rets <- matrix(rnorm(T*K, sd = 0.01), T, K); colnames(rets) <- colnames(vols)
+#' # Toy example with K = 3 (requires the suggested 'quadprog' package)
+#' if (requireNamespace("quadprog", quietly = TRUE)) {
+#'   T <- 50; K <- 3
+#'   set.seed(42)
+#'   vols <- matrix(0.2 + 0.05*abs(sin(seq_len(T)/7)), T, K)
+#'   colnames(vols) <- paste0("A", 1:K)
+#'   # simple, stationary correlations
+#'   pred_corr <- cbind(rep(0.20, T), rep(0.10, T), rep(0.05, T))  # order: (2,1), (3,1), (3,2)
+#'   rets <- matrix(rnorm(T*K, sd = 0.01), T, K); colnames(rets) <- colnames(vols)
 #'
-#' mv <- rsdc_minvar(sigma_matrix  = vols,
-#'                   value_cols    = colnames(vols),
-#'                   predicted_corr= pred_corr,
-#'                   y             = rets,
-#'                   long_only     = TRUE)
-#' head(mv$weights)
-#' mv$volatility
+#'   mv <- rsdc_minvar(sigma_matrix  = vols,
+#'                     value_cols    = colnames(vols),
+#'                     predicted_corr= pred_corr,
+#'                     y             = rets,
+#'                     long_only     = TRUE)
+#'   head(mv$weights)
+#'   mv$volatility
+#' }
 #'
 #' @seealso \code{\link{rsdc_maxdiv}} (maximum diversification),
 #'   \code{\link[quadprog]{solve.QP}}
@@ -106,7 +108,7 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
     cov_t <- D %*% R %*% D
     cov_matrices[[t]] <- cov_t
 
-    tryCatch({
+    weights <- tryCatch({
       Dmat <- 2 * cov_t
       dvec <- rep(0, K)
 
@@ -119,10 +121,8 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
       }
 
       qp <- quadprog::solve.QP(Dmat, dvec, Amat, bvec, meq = 1)
-      weights <- qp$solution
-    }, error = function(e) {
-      weights <<- rep(1 / K, K)
-    })
+      qp$solution
+    }, error = function(e) rep(1 / K, K))
 
     portfolio_weights[t, ] <- weights
     portfolio_returns[t] <- if (lag) {
@@ -255,7 +255,7 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
       - weighted_avg_vol / port_vol
     }
 
-    tryCatch({
+    weights <- tryCatch({
       sol <- Rsolnp::solnp(
         pars = rep(1 / K, K),
         fun = div_obj,
@@ -265,10 +265,8 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
         UB = UB,
         control = list(trace = 0, tol = 1e-8)
       )
-      weights <- sol$pars
-    }, error = function(e) {
-      weights <<- rep(1 / K, K)
-    })
+      sol$pars
+    }, error = function(e) rep(1 / K, K))
 
     portfolio_weights[t, ] <- weights
     portfolio_returns[t] <- if (lag) {

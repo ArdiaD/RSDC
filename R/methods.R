@@ -176,7 +176,7 @@ confint.rsdc_fit <- function(object, parm, level = 0.95,
                              type = c("hessian", "opg", "sandwich"), ...) {
   type <- match.arg(type)
   cf <- coef(object); V <- vcov(object, type = type)
-  ses <- sqrt(diag(V))
+  ses <- .rsdc_safe_sqrt(diag(V))  # consistent with summary(); non-PD diagonals -> NA
   if (missing(parm)) parm <- names(cf)
   a <- (1 - level) / 2
   fac <- stats::qnorm(c(a, 1 - a))

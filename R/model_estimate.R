@@ -446,8 +446,13 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     # below are all consistent with the returned transition_matrix.
     final_par[1:n_trans] <- as.vector(t(P[, seq_len(N - 1L), drop = FALSE]))
     optim_result$value <- rsdc_likelihood(final_par, y = y_optim, exog = NULL, K = K, N = N)
+    # The projected vector is not a true optimum under the simplex constraints, so flag
+    # non-convergence and suppress observed-information SEs (the Hessian at a projected,
+    # non-stationary point is not a valid basis for inference).
+    optim_result$convergence <- 99L
     warning("Transition matrix had an infeasible row (free probabilities summed > 1) ",
-            "and was projected onto the simplex; the optimiser may not have converged. ",
+            "and was projected onto the simplex; the optimiser did not converge to a ",
+            "feasible optimum. Standard errors are suppressed (convergence flagged). ",
             "Increase control$itermax or control$NP.")
   }
 
@@ -461,7 +466,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     -rsdc_likelihood(final_par, y = y_oos, exog = NULL, K = K, N = N)
   else NULL
 
-  vcov <- if (isTRUE(con$compute_se))
+  vcov <- if (isTRUE(con$compute_se) && !infeasible_row)
     .rsdc_vcov(final_par, rsdc_likelihood, y = y_optim, exog = NULL, K = K, N = N)
   else NULL
 
@@ -717,9 +722,15 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
   if (!is.null(N) && N < 2) stop("N must be at least 2. Use method='const' for a single-regime model.")
 
   if (!is.matrix(residuals)) stop("residuals must be a numeric matrix.")
+  if (ncol(residuals) < 2L)
+    stop("residuals must have at least 2 columns (K >= 2); the model estimates a ",
+         "multivariate correlation structure.")
   if (any(!is.finite(residuals))) stop("residuals must not contain NA/NaN/Inf values.")
   if (!is.null(X) && any(!is.finite(as.matrix(X))))
     stop("X must not contain NA/NaN/Inf values.")
+  if (!is.null(X) && nrow(as.matrix(X)) != nrow(residuals))
+    stop(sprintf("X must have the same number of rows as residuals (nrow(X) = %d, nrow(residuals) = %d).",
+                 nrow(as.matrix(X)), nrow(residuals)))
 
   # Correlation-only model: columns are assumed mean-zero, unit-variance. Warn (do not
   # auto-transform) when inputs deviate materially so raw returns are not silently misspecified.
