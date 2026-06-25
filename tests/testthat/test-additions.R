@@ -20,6 +20,33 @@ test_that("rsdc_viterbi returns a valid most-likely regime path", {
   expect_true(all(v %in% 1:2))
 })
 
+test_that("rsdc_viterbi recovers a well-separated regime path", {
+  skip_on_cran()
+  set.seed(11)
+  TT <- 400L
+  X <- cbind(1, rep(0, TT))                       # constant covariate -> constant P
+  lg <- function(p) log(p / (1 - p))
+  beta <- rbind(c(lg(0.97), 0), c(lg(0.97), 0))   # persistent stay probs
+  Sig  <- array(c(matrix(c(1, 0.0, 0.0, 1), 2),   # regime 1: low correlation
+                  matrix(c(1, 0.95, 0.95, 1), 2)), # regime 2: high correlation
+                c(2, 2, 2))
+  s <- rsdc_simulate(TT, X, beta, matrix(0, 2, 2), Sig, N = 2, seed = 3)
+  f <- rsdc_estimate("tvtp", residuals = scale(s$observations), N = 2, X = X,
+                     control = list(itermax = 40, seed = 1))
+  v <- rsdc_viterbi(f)
+  expect_true(mean(v == s$states) > 0.75)         # MAP path tracks the true states
+})
+
+test_that("rsdc_forecast_ahead regime probabilities converge to the ergodic distribution (noX)", {
+  skip_on_cran()
+  set.seed(12); y <- scale(matrix(rnorm(300 * 2), 300, 2))
+  f <- rsdc_estimate("noX", residuals = y, N = 2, control = list(itermax = 40))
+  fa <- rsdc_forecast_ahead(f, horizon = 300L)
+  P  <- f$transition_matrix
+  ev <- eigen(t(P)); pic <- Re(ev$vectors[, which.min(abs(ev$values - 1))]); pic <- pic / sum(pic)
+  expect_equal(as.numeric(fa$regime_probs[300, ]), pic, tolerance = 1e-3)
+})
+
 test_that("rsdc_forecast_ahead returns h-step regime and correlation forecasts", {
   skip_on_cran()
   set.seed(3); y <- scale(matrix(rnorm(200 * 2), 200, 2))

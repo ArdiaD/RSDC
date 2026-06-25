@@ -727,7 +727,8 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           residuals, N = 2, X = NULL,
                           out_of_sample = FALSE, control = list()) {
   method <- match.arg(method)
-  if (!is.null(N) && N < 2) stop("N must be at least 2. Use method='const' for a single-regime model.")
+  if (method != "const" && !is.null(N) && N < 2)
+    stop("N must be at least 2. Use method='const' for a single-regime model.")
 
   if (!is.matrix(residuals)) stop("residuals must be a numeric matrix.")
   if (ncol(residuals) < 2L)
@@ -781,8 +782,10 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
     fits <- lapply(seeds, function(s) { search_ctrl$seed <- s; fit_once(search_ctrl) })
     start_logliks <- vapply(fits, function(f) f$log_likelihood, numeric(1))
     best <- which.max(start_logliks)
-    # Recompute the winning fit with the user's compute_se setting.
-    final_ctrl <- control; final_ctrl$n_starts <- NULL; final_ctrl$seed <- seeds[best]
+    # Recompute the winning fit with the user's compute_se setting, warm-starting the
+    # local optimiser at the winner's parameters (avoids repeating the global search).
+    final_ctrl <- control; final_ctrl$n_starts <- NULL
+    final_ctrl$seed <- seeds[best]; final_ctrl$start <- fits[[best]]$par
     fit <- fit_once(final_ctrl)
   } else {
     fc <- control; fc$n_starts <- NULL

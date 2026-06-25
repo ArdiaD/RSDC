@@ -68,9 +68,13 @@ fraction and forecast on the remainder.
 \itemize{
 \item \code{"const"} — constant correlation from \code{final_params$correlations[1,]}, repeated across time.
 \item \code{"noX"}/\code{"tvtp"} — regime-probability weighted average of regime
-correlations. To avoid look-ahead, out-of-sample forecasts
-(\code{out_of_sample = TRUE}) weight by \emph{filtered} probabilities
-\eqn{\Pr(S_t \mid \Omega_t)}; the full-sample case uses \emph{smoothed}
+correlations. Out-of-sample (\code{out_of_sample = TRUE}) the weights are the
+\emph{filtered} probabilities \eqn{\Pr(S_t \mid \Omega_t)}, which use no
+\emph{future} information beyond time \eqn{t} (the OOS window is initialized from
+the in-sample terminal filtered state). Note these condition on the
+\emph{contemporaneous} \eqn{U_t}, so they are a real-time \emph{nowcast}, not a
+strictly pre-observation one-step-ahead forecast; for the latter use
+\code{\link{rsdc_forecast_ahead}}. The full-sample case uses \emph{smoothed}
 probabilities \eqn{\Pr(S_t \mid \Omega_T)}. The returned
 \code{smoothed_probs} field always contains the smoothed probabilities.
 }

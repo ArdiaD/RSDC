@@ -272,6 +272,8 @@ predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
 #' @exportS3Method simulate rsdc_fit
 simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL, ...) {
   if (!requireNamespace("mvtnorm", quietly = TRUE)) stop("Please install 'mvtnorm'.")
+  if (!is.null(nsim) && !isTRUE(nsim == 1))
+    warning("simulate(): nsim > 1 is not supported; returning a single simulated path.")
   if (!is.null(seed)) set.seed(seed)
   N <- object$N; K <- object$K
   sigma <- object$covariances

@@ -42,6 +42,9 @@
 rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
                             level = 0.95, seed = NULL) {
   if (!inherits(object, "rsdc_fit")) stop("object must be an 'rsdc_fit'.")
+  if (!is.numeric(B) || length(B) != 1L || B < 2) stop("B must be a single integer >= 2.")
+  if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
+    stop("level must be a single number in (0, 1).")
   if (is.null(object$vcov))
     stop("rsdc_corr_bands needs a covariance matrix; refit with ",
          "control = list(compute_se = TRUE).")
@@ -81,6 +84,10 @@ rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
   B_used <- length(paths)
   if (B_used < 2L)
     stop("Too few valid parameter draws produced a finite path; increase B or check the fit.")
+  if (B_used < B)
+    warning(sprintf(paste("%d of %d parameter draws produced an invalid (e.g. non-positive-definite)",
+                          "correlation path and were dropped; the band uses %d draws."),
+                    B - B_used, B, B_used))
 
   a <- (1 - level) / 2
   pair_labels <- {

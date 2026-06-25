@@ -61,7 +61,11 @@ rsdc_viterbi <- function(object, residuals = NULL, X = NULL) {
 
   delta <- matrix(-Inf, N, Tn)
   psi   <- matrix(0L,   N, Tn)
-  delta[, 1] <- log(1 / N) + logdens[, 1]
+  # t = 1 prior matches the Hamilton filter's predicted distribution, t(P_1) %*% (1/N),
+  # rather than a flat 1/N (which would not decode the fitted model for asymmetric P).
+  pi1 <- as.numeric(crossprod(P_t(1), rep(1 / N, N)))
+  pi1[pi1 <= 0] <- .Machine$double.xmin
+  delta[, 1] <- log(pi1) + logdens[, 1]
   for (t in 2:Tn) {
     lp <- logP(t)                      # lp[i, s] = log Pr(S_t = s | S_{t-1} = i)
     for (s in seq_len(N)) {

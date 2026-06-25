@@ -25,17 +25,18 @@
 # check): rprojroot, devtools (for load_all), and optionally RhpcBLASctl. Base
 # 'parallel' ships with R. Install any missing ones before sourcing.
 # =============================================================================
-# Resolve the package root (the folder containing DESCRIPTION) without hardcoding a
-# machine-specific path. rprojroot ships with devtools, so no extra dependency is
-# needed; if the root cannot be found we fall back to the current directory.
-root <- tryCatch(rprojroot::find_root(rprojroot::has_file("DESCRIPTION")),
-                 error = function(e) getwd())
-setwd(root)
-if (!file.exists("DESCRIPTION"))
-  stop("Could not locate the RSDC package root. Set the working directory to the ",
-       "folder containing DESCRIPTION, then re-source this script.")
-
-devtools::load_all()
+# Load RSDC. End users running this from an installed package just need
+# `library(RSDC)`; for development (running from the source tree) we fall back to
+# devtools::load_all() if the package is not installed.
+if (requireNamespace("RSDC", quietly = TRUE)) {
+  library("RSDC")
+} else if (requireNamespace("devtools", quietly = TRUE)) {
+  root <- tryCatch(rprojroot::find_root(rprojroot::has_file("DESCRIPTION")),
+                   error = function(e) getwd())
+  devtools::load_all(root)
+} else {
+  stop("Install RSDC (or, for development, the 'devtools' package) before running this script.")
+}
 
 # ── Global configuration ──────────────────────────────────────────────────────
 M        <- 100L
