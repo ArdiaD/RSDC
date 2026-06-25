@@ -1,9 +1,11 @@
 ## Submission
 
-This is the first CRAN submission of RSDC (regime-switching dynamic correlation
-models). The version number is 1.5-0 because the package was developed and
-versioned iteratively before this initial public release (see NEWS.md); the
-functionality is stable and the API is settled.
+This is an update of the package already on CRAN (current version 1.1-2,
+published 2025-09-03) to version 1.5-0. The update adds the C++ Hamilton filter,
+the `mccc`/`greenbrown` datasets, the `"rsdc_fit"` S3 interface (print/summary/
+coef/logLik/nobs/vcov/confint/predict/simulate/plot), numerical and bootstrap
+standard errors, multi-step forecasts, parameter-uncertainty bands, Viterbi
+decoding, and broom/ggplot2 methods. See NEWS.md for the full history.
 
 ## Test environments
 * Local: macOS Sequoia 15.6, R 4.5.1
@@ -14,11 +16,13 @@ functionality is stable and the API is settled.
 0 errors | 0 warnings | 1 note
 
 ## Notes
-* New submission.
 * "Namespace in Imports field not imported from: 'Rdpack'". Rdpack is imported
   only to provide the Rd macros (e.g. \insertRef) used for references in the
   documentation; it is declared under RdMacros in DESCRIPTION, so the import is
   required even though no R object is imported from it.
+
+## Reverse dependencies
+There are no reverse dependencies on CRAN.
 
 ## Notes for the maintainer
 * The package contains compiled code (Rcpp/RcppArmadillo). A local clang build
