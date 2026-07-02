@@ -225,8 +225,12 @@ rsdc_forecast <- function(method = c("tvtp", "noX", "const"),
     n_bic  <- if (out_of_sample) is_cut else n_obs
     ll_bic <- final_params$log_likelihood
   }
-  if (is.null(ll_bic))
+  if (is.null(ll_bic)) {
+    # `2 * NULL` would yield numeric(0); return a scalar NA so downstream code
+    # expecting a length-1 BIC does not break silently.
     warning("BIC is NA: log_likelihood missing from final_params.")
+    ll_bic <- NA_real_
+  }
   BIC <- log(n_bic) * k - 2 * ll_bic
 
   list(

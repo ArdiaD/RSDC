@@ -111,6 +111,13 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     if (length(con$start) != length(bounds$lower))
       stop("control$start must have length ", length(bounds$lower), " for this model.")
     de_best <- con$start
+    # A warm start can be a relabeled optimum lying outside the default box:
+    # after the identifiability re-ordering, re-referenced softmax betas can
+    # reach [-20, 20]. L-BFGS-B silently projects an infeasible start onto the
+    # box, which can quietly degrade the refit (multi-start, bootstrap); widen
+    # the box just enough to keep the supplied start feasible instead.
+    bounds$lower <- pmin(bounds$lower, de_best)
+    bounds$upper <- pmax(bounds$upper, de_best)
   } else {
     results <- DEoptim::DEoptim(
       fn = rsdc_likelihood,
@@ -349,6 +356,14 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     if (length(con$start) != length(bounds$lower))
       stop("control$start must have length ", length(bounds$lower), " for this model.")
     de_best <- con$start
+    # A warm start can be a relabeled optimum lying outside the default box:
+    # after the identifiability re-ordering (N >= 3), a former row-complement
+    # transition entry can fall below 0.01 (or above 0.99) while remaining a
+    # valid probability. L-BFGS-B silently projects an infeasible start onto
+    # the box, which can quietly degrade the refit (multi-start, bootstrap);
+    # widen the box just enough to keep the supplied start feasible instead.
+    bounds$lower <- pmin(bounds$lower, de_best)
+    bounds$upper <- pmax(bounds$upper, de_best)
   } else {
     de_result <- DEoptim::DEoptim(
       fn = rsdc_likelihood,

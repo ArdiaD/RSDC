@@ -1,4 +1,15 @@
 # Changes in Version 1.5-0 (DA,BS,RN)
+- Bug fix (audit): `rsdc_forecast()` now returns a scalar `NA` BIC (instead of a
+  silent zero-length `numeric(0)`) when `final_params$log_likelihood` is missing.
+- Bug fix (audit): a warm start (`control$start`) lying outside the default
+  L-BFGS-B search box — as produced by the identifiability relabeling for
+  `N >= 3` (re-referenced softmax betas, former row-complement transition
+  entries) — is no longer silently projected onto the box; the box is widened
+  element-wise to keep the supplied start feasible (affects multi-start refits
+  and `rsdc_bootstrap()` warm starts).
+- CRAN hygiene: stray local session files under `inst/simulation/results/` are
+  now build-ignored, and the declared `Rdpack` import is used
+  (`importFrom(Rdpack, reprompt)`), clearing both `R CMD check` NOTEs.
 - Multi-start estimation: `control$n_starts` repeats the global+local search from
   several seeds and keeps the highest-likelihood fit, storing `start_logliks`.
   Since `DEoptim` is a stochastic global search, this is primarily a stability

@@ -14,3 +14,6 @@
 ^src/.*\.dll$
 ^src/.*\.dylib$
 ^.*\.DS_Store$
+^inst/simulation/results/\.RData$
+^inst/simulation/results/\.Rhistory$
+^inst/simulation/results/\.Rapp\.history$

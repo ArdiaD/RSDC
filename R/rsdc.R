@@ -49,6 +49,7 @@
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
 #' @useDynLib RSDC, .registration = TRUE
+#' @importFrom Rdpack reprompt
 #' @importFrom Rcpp sourceCpp
 #' @importFrom DEoptim DEoptim
 #' @importFrom stats optim plogis cor sd

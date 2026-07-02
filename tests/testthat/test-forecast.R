@@ -126,3 +126,17 @@ test_that("rsdc_forecast out_of_sample=TRUE shapes match OOS horizon (tvtp)", {
   expect_equal(dim(out$smoothed_probs), c(N, n_oos))
   expect_true(is.finite(out$BIC))
 })
+
+test_that("rsdc_forecast BIC is a scalar NA (not numeric(0)) when log_likelihood is missing", {
+  K <- 3; T <- 20
+  y <- toy_residuals(T, K)
+  S <- toy_sigma_matrix(T, K)
+  expect_warning(
+    out <- rsdc_forecast(method = "const", N = 1, residuals = y,
+                         final_params = list(
+                           correlations = matrix(c(0.2, 0.1, 0.05), nrow = 1)),
+                         sigma_matrix = S, value_cols = colnames(S)),
+    "BIC is NA")
+  expect_length(out$BIC, 1L)
+  expect_true(is.na(out$BIC))
+})

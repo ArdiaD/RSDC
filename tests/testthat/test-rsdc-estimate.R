@@ -68,3 +68,31 @@ test_that("rsdc_estimate noX N=3: returned P and correlations are consistent wit
   expect_equal(-nll, fit$log_likelihood, tolerance = 1e-6)
 })
 
+
+test_that("warm start outside the default box is kept feasible, not projected (M1)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- toy_residuals(T = 80, K = 2)
+
+  # noX, N = 3: a valid parameter vector whose second-row free transition entry
+  # (0.005) lies below the default 0.01 bound, as can happen after the
+  # identifiability re-ordering of a former row-complement entry.
+  start_nox <- c(0.90, 0.05,  0.005, 0.90,  0.30, 0.40,  # 6 free trans (N=3)
+                 -0.20, 0.10, 0.60)                      # 3 rho (K=2)
+  ll_start <- -rsdc_likelihood(start_nox, y = y, exog = NULL, K = 2, N = 3)
+  expect_true(is.finite(ll_start))  # the start itself is a valid model
+  fit <- rsdc_estimate("noX", residuals = y, N = 3,
+                       control = list(start = start_nox, compute_se = FALSE))
+  # From a feasible warm start, the local refit can only improve the likelihood.
+  expect_gte(fit$log_likelihood, ll_start - 1e-6)
+
+  # tvtp, N = 2: a beta outside the default [-10, 10] box (as produced by the
+  # softmax re-referencing after relabeling) must not error or degrade the fit.
+  X <- cbind(1, as.numeric(scale(seq_len(nrow(y)))))
+  start_tvtp <- c(15, 0.5,  2, -0.5,   0.10, 0.60)  # beta (2x2), rho (2x1)
+  ll_start2 <- -rsdc_likelihood(start_tvtp, y = y, exog = X, K = 2, N = 2)
+  expect_true(is.finite(ll_start2))
+  fit2 <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X,
+                        control = list(start = start_tvtp, compute_se = FALSE))
+  expect_gte(fit2$log_likelihood, ll_start2 - 1e-6)
+})
