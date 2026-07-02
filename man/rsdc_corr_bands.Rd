@@ -50,6 +50,14 @@ This reflects estimation (parameter) uncertainty in the correlation
 parameters and transition dynamics; it does not add the irreducible
 regime-classification uncertainty already summarized by the smoothed
 probabilities.
+
+Draws are taken from the \emph{unconstrained} Gaussian approximation; draws
+that yield an invalid model (e.g. \eqn{|\rho| \ge 1}, a non-positive-definite
+correlation matrix, or an invalid transition matrix) are dropped with a
+warning and the band is computed from the remaining draws. When the estimate
+sits close to a parameter bound this truncates the sampling distribution, so
+the reported band can be somewhat too narrow there; the attribute
+\code{B_used} reports how many draws survived.
 }
 \examples{
 \donttest{

@@ -10,6 +10,19 @@
 - CRAN hygiene: stray local session files under `inst/simulation/results/` are
   now build-ignored, and the declared `Rdpack` import is used
   (`importFrom(Rdpack, reprompt)`), clearing both `R CMD check` NOTEs.
+- `rsdc_minvar()`/`rsdc_maxdiv()`: when `value_cols` is a character vector and
+  `y` carries column names, misaligned columns are now detected — reordered to
+  `value_cols` (with a warning) when the names match as a set, otherwise a
+  warning states that positional order is assumed. Previously the names were
+  silently overwritten.
+- `rsdc_forecast_ahead()` now validates that `X_future` has the same number of
+  columns as the estimation covariate matrix `X`.
+- `plot.rsdc_fit()` error message corrected: stored regime probabilities do not
+  depend on `compute_se`.
+- Documentation: `rsdc_corr_bands()` documents the truncation of invalid
+  Gaussian draws near parameter bounds.
+- Removed dead `requireNamespace("mvtnorm")` guards (`mvtnorm` is a hard
+  dependency in `Imports`).
 - Multi-start estimation: `control$n_starts` repeats the global+local search from
   several seeds and keeps the highest-likelihood fit, storing `start_logliks`.
   Since `DEoptim` is a stochastic global search, this is primarily a stability

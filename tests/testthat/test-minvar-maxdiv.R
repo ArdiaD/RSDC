@@ -49,3 +49,29 @@ test_that("rsdc_maxdiv produces valid outputs", {
   expect_true(is.finite(res$volatility))
 })
 
+
+test_that("rsdc_minvar reorders/warns when colnames(y) disagree with value_cols (L2)", {
+  skip_if_not_installed("quadprog")
+  T <- 15; K <- 3
+  set.seed(9)
+  S <- toy_sigma_matrix(T, K)                       # columns sigma1..sigmaK
+  colnames(S) <- paste0("A", 1:K)
+  pred_corr <- matrix(0.1, T, choose(K, 2))
+  y <- matrix(rnorm(T * K, sd = 0.01), T, K)
+  colnames(y) <- paste0("A", 1:K)
+
+  # same names, shuffled order -> reordered with a warning; results must match
+  # the correctly ordered call
+  y_shuffled <- y[, c(2, 3, 1)]
+  expect_warning(
+    mv_shuf <- rsdc_minvar(S, paste0("A", 1:K), pred_corr, y_shuffled),
+    "reordered")
+  mv_ok <- rsdc_minvar(S, paste0("A", 1:K), pred_corr, y)
+  expect_equal(mv_shuf$weights, mv_ok$weights)
+  expect_equal(mv_shuf$volatility, mv_ok$volatility)
+
+  # unrelated names -> assume positional order, but warn
+  y_odd <- y; colnames(y_odd) <- paste0("Z", 1:K)
+  expect_warning(rsdc_minvar(S, paste0("A", 1:K), pred_corr, y_odd),
+                 "assumed")
+})

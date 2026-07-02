@@ -271,7 +271,6 @@ predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
 #' @param n Series length for \code{"noX"}/\code{"const"} (defaults to the fitted T).
 #' @exportS3Method simulate rsdc_fit
 simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL, ...) {
-  if (!requireNamespace("mvtnorm", quietly = TRUE)) stop("Please install 'mvtnorm'.")
   if (!is.null(nsim) && !isTRUE(nsim == 1))
     warning("simulate(): nsim > 1 is not supported; returning a single simulated path.")
   if (!is.null(seed)) set.seed(seed)
@@ -314,8 +313,9 @@ plot.rsdc_fit <- function(x, which = c("smoothed", "filtered"), ...) {
   which <- match.arg(which)
   pr <- if (which == "filtered") x$filtered_probs else x$smoothed_probs
   if (is.null(pr))
-    stop("No regime probabilities stored. The constant model has a single regime, ",
-         "or the fit was produced without them; refit with compute_se = TRUE.")
+    stop("No regime probabilities stored. The constant model has a single regime; ",
+         "otherwise the fit lacks stored residuals or the filter failed at the ",
+         "estimates. Use rsdc_hamilton() on your residuals to compute them directly.")
   N <- nrow(pr); Tn <- ncol(pr)
   op <- graphics::par(mfrow = c(N, 1), mar = c(3.2, 4, 1.4, 1), las = 1)
   on.exit(graphics::par(op))

@@ -77,8 +77,14 @@ rsdc_forecast_ahead <- function(object, horizon = 10L, residuals = NULL,
   if (method == "tvtp" && is.null(X_future))
     message("X_future not supplied; holding the last observed covariate row constant ",
             "across the forecast horizon.")
-  if (method == "tvtp" && !is.null(X_future) && nrow(X_future) < horizon)
-    stop("X_future must have at least 'horizon' rows.")
+  if (method == "tvtp" && !is.null(X_future)) {
+    X_future <- as.matrix(X_future)
+    if (ncol(X_future) != ncol(X))
+      stop(sprintf("X_future must have %d column(s) to match the covariate matrix X (got %d).",
+                   ncol(X), ncol(X_future)))
+    if (nrow(X_future) < horizon)
+      stop("X_future must have at least 'horizon' rows.")
+  }
 
   reg <- matrix(NA_real_, horizon, N)
   pc  <- matrix(NA_real_, horizon, C)

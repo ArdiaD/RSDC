@@ -1,3 +1,27 @@
+# Coerce the returns matrix y to T x K and align its columns with value_cols.
+# y is documented to be in value_cols order; when value_cols is a character
+# vector and y carries column names we can verify that. If the names match as a
+# set but not in order, reorder (with a warning); if they differ, warn that
+# positional order is assumed. Integer value_cols index sigma_matrix, not y,
+# so no name check is possible there.
+#' @noRd
+.rsdc_align_y <- function(y, value_cols, K) {
+  cn <- colnames(y)
+  if (is.character(value_cols) && !is.null(cn) && !identical(cn, value_cols)) {
+    if (setequal(cn, value_cols) && !anyDuplicated(cn)) {
+      warning("columns of y were reordered to match value_cols (",
+              paste(value_cols, collapse = ", "), ").")
+      y <- y[, value_cols, drop = FALSE]
+    } else {
+      warning("colnames(y) do not match value_cols; y is assumed to already be ",
+              "in value_cols order.")
+    }
+  }
+  y <- matrix(as.numeric(y), ncol = K)
+  colnames(y) <- value_cols
+  y
+}
+
 #' Minimum-Variance Portfolio (Rolling Weights)
 #'
 #' Computes rolling minimum-variance (MV) portfolio weights from a sequence of
@@ -80,8 +104,7 @@ rsdc_minvar <- function(sigma_matrix, value_cols, predicted_corr, y,
   }
 
   K <- length(value_cols)
-  y <- matrix(as.numeric(y), ncol = K)
-  colnames(y) <- value_cols
+  y <- .rsdc_align_y(y, value_cols, K)
 
   stopifnot(
     ncol(predicted_corr) == choose(K, 2),
@@ -216,8 +239,7 @@ rsdc_maxdiv <- function(sigma_matrix, value_cols, predicted_corr, y,
   }
 
   K <- length(value_cols)
-  y <- matrix(as.numeric(y), ncol = K)
-  colnames(y) <- value_cols
+  y <- .rsdc_align_y(y, value_cols, K)
 
   stopifnot(
     ncol(predicted_corr) == choose(K, 2),

@@ -83,10 +83,6 @@
 #'
 #' @export
 rsdc_simulate <- function(n, X, beta, mu, sigma, N, seed = NULL) {
-  if (!requireNamespace("mvtnorm", quietly = TRUE)) {
-    stop("Please install 'mvtnorm'.")
-  }
-
   if (!is.null(seed)) set.seed(seed)
 
   K <- ncol(mu)

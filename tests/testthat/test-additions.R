@@ -105,3 +105,18 @@ test_that("autoplot returns a ggplot for switching models", {
   p <- ggplot2::autoplot(f)
   expect_s3_class(p, "ggplot")
 })
+
+test_that("rsdc_forecast_ahead validates the width of X_future (L3)", {
+  skip_on_cran()
+  set.seed(5); Tn <- 120
+  y <- scale(matrix(rnorm(Tn * 2), Tn, 2))
+  X <- cbind(1, as.numeric(scale(seq_len(Tn))))
+  f <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X,
+                     control = list(itermax = 40, compute_se = FALSE))
+  # wrong number of columns must error, not silently mis-multiply
+  expect_error(rsdc_forecast_ahead(f, horizon = 3L, X_future = matrix(1, 3, 3)),
+               "X_future must have 2 column")
+  # correct width works
+  fa <- rsdc_forecast_ahead(f, horizon = 3L, X_future = cbind(1, c(0, 0.1, 0.2)))
+  expect_equal(dim(fa$regime_probs), c(3L, 2L))
+})

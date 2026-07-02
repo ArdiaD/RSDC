@@ -13,6 +13,14 @@
 #' regime-classification uncertainty already summarized by the smoothed
 #' probabilities.
 #'
+#' Draws are taken from the \emph{unconstrained} Gaussian approximation; draws
+#' that yield an invalid model (e.g. \eqn{|\rho| \ge 1}, a non-positive-definite
+#' correlation matrix, or an invalid transition matrix) are dropped with a
+#' warning and the band is computed from the remaining draws. When the estimate
+#' sits close to a parameter bound this truncates the sampling distribution, so
+#' the reported band can be somewhat too narrow there; the attribute
+#' \code{B_used} reports how many draws survived.
+#'
 #' @param object An \code{"rsdc_fit"} object (from \code{\link{rsdc_estimate}})
 #'   estimated with \code{control = list(compute_se = TRUE)} so a covariance is
 #'   available.
@@ -48,8 +56,6 @@ rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
   if (is.null(object$vcov))
     stop("rsdc_corr_bands needs a covariance matrix; refit with ",
          "control = list(compute_se = TRUE).")
-  if (!requireNamespace("mvtnorm", quietly = TRUE))
-    stop("Package 'mvtnorm' is required for rsdc_corr_bands().")
   method <- object$method; N <- object$N; K <- object$K
   C <- K * (K - 1) / 2
   if (is.null(residuals)) residuals <- object$residuals
