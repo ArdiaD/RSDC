@@ -291,7 +291,11 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
 #' @details
 #' \itemize{
 #'   \item \strong{Parameterization:} For \eqn{N=2}, the transition parameters are
-#'         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}.
+#'         \eqn{\{p_{11}, p_{22}\}}; off-diagonals are \eqn{1 - p_{ii}}. For
+#'         \eqn{N \ge 3}, each row carries \eqn{N-1} free probabilities (packed
+#'         row-wise) and the last column is the row complement; infeasible rows
+#'         (free probabilities summing above 1) are penalized during optimization
+#'         and, if present at the optimum, projected onto the simplex with a warning.
 #'   \item \strong{Bounds:} \eqn{p_{ii} \in [0.01, 0.99]} and \eqn{\rho \in (-1, 1)}
 #'     for numerical stability and identifiability.
 #'   \item \strong{Correlation build:} Each regime's correlation matrix is reconstructed from

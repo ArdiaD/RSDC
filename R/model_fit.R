@@ -328,6 +328,11 @@ rsdc_hamilton <- function(y, X = NULL, beta = NULL, rho_matrix, K, N, P = NULL,
 #'           \item \emph{Fixed P (no \code{exog}):} \code{params} begins with transition
 #'                 parameters. For \eqn{N=2}, the implementation maps them to
 #'                 \eqn{P=\begin{pmatrix} p_{11} & 1-p_{11}\\ 1-p_{22} & p_{22}\end{pmatrix}}.
+#'                 For \eqn{N \ge 3}, row \eqn{i} of \eqn{P} holds \eqn{N-1} free
+#'                 probabilities (packed row-wise in \code{params}) filling columns
+#'                 \eqn{1,\dots,N-1}; the last column is the row complement
+#'                 \eqn{1-\sum_{j<N} P_{ij}}. Proposals with a negative entry
+#'                 (row sum of free probabilities above 1) are penalized.
 #'           \item \emph{TVTP:} with \code{exog}, for \eqn{N=2},
 #'                 \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)} and
 #'                 \eqn{p_{ij,t} = 1 - p_{ii,t}} (\eqn{j \ne i});

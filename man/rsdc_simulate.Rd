@@ -17,8 +17,8 @@ state from \eqn{t(P_1)\,\pi_0}; rows \code{X[t, ]} for \eqn{t \ge 2} form \eqn{P
 packed row-wise by regime, matching the parameterization of
 \code{\link{rsdc_hamilton}} and \code{\link{rsdc_estimate}}. For \eqn{N=2},
 each row is a length-\eqn{p} logistic vector:
-\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N=3},
-each row packs \eqn{N-1=2} softmax vectors of length \eqn{p}; the \eqn{N}-th
+\eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N \ge 3},
+each row packs \eqn{N-1} softmax vectors of length \eqn{p}; the \eqn{N}-th
 logit is the reference (zero).}
 
 \item{mu}{Numeric matrix \eqn{N \times K}. Regime-specific mean vectors.}

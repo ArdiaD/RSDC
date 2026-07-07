@@ -13,8 +13,8 @@
 #'   packed row-wise by regime, matching the parameterization of
 #'   \code{\link{rsdc_hamilton}} and \code{\link{rsdc_estimate}}. For \eqn{N=2},
 #'   each row is a length-\eqn{p} logistic vector:
-#'   \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N=3},
-#'   each row packs \eqn{N-1=2} softmax vectors of length \eqn{p}; the \eqn{N}-th
+#'   \eqn{p_{ii,t} = \mathrm{logit}^{-1}(X_t^\top \beta_i)}. For \eqn{N \ge 3},
+#'   each row packs \eqn{N-1} softmax vectors of length \eqn{p}; the \eqn{N}-th
 #'   logit is the reference (zero).
 #' @param mu Numeric matrix \eqn{N \times K}. Regime-specific mean vectors.
 #' @param sigma Numeric array \eqn{K \times K \times N}. Regime-specific covariance

@@ -57,7 +57,7 @@
 #'         \eqn{\Sigma_t = D_t R_t D_t}.
 #'   \item \strong{BIC:} Parameter count \eqn{k} is
 #'         \code{N * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"} with \eqn{N=2},
-#'         \code{N * (N-1) * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"} with \eqn{N=3},
+#'         \code{N * (N-1) * ncol(X) + N * K * (K - 1) / 2} for \code{"tvtp"} with \eqn{N \ge 3},
 #'         \code{N * (N - 1) + N * K * (K - 1) / 2} for \code{"noX"},
 #'         and \code{K * (K - 1) / 2} for \code{"const"}.
 #' }
