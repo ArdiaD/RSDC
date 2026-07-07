@@ -161,16 +161,24 @@ print.rsdc_fit <- function(x, digits = 4, ...) {
   cat(sprintf("logLik = %.3f", x$log_likelihood))
   if (!is.null(x$npar)) cat(sprintf("   npar = %d   AIC = %.2f   BIC = %.2f",
                                     x$npar, stats::AIC(x), stats::BIC(x)))
-  cat("\n\nRegime correlations (rows = regimes, ascending mean):\n")
+  if (x$method == "const" || x$N == 1L) {
+    cat("\n\nCorrelations (single regime, lower-triangular):\n")
+  } else {
+    cat("\n\nRegime correlations (rows = regimes, ascending mean):\n")
+  }
   print(round(x$correlations, digits))
   if (x$method != "const") {
-    cat("\nTransition matrix (at mean covariate for tvtp):\n")
+    if (x$method == "tvtp") {
+      cat("\nTransition matrix (evaluated at the in-sample covariate means):\n")
+    } else {
+      cat("\nTransition matrix:\n")
+    }
     print(round(x$transition_matrix, digits))
   }
   if (!is.null(x$convergence))
     cat(sprintf("\nOptimiser convergence code: %d (0 = converged)\n", x$convergence))
   if (is.null(x$se))
-    cat("Standard errors: not available (singular/unavailable Hessian).\n")
+    cat("Standard errors: not available (compute_se = FALSE or singular/unavailable Hessian).\n")
   invisible(x)
 }
 
@@ -274,16 +282,24 @@ print.summary.rsdc_fit <- function(x, digits = 4, ...) {
     cat("Coefficients:\n")
     stats::printCoefmat(x$coefficients, digits = digits, has.Pvalue = TRUE)
   } else {
-    cat("Coefficients: standard errors unavailable (singular Hessian).\n")
+    cat("Coefficients: standard errors unavailable (compute_se = FALSE or singular Hessian).\n")
     cat("Regime correlations:\n")
     print(round(x$correlations, digits))
   }
   if (!is.null(x$natural_se) && !is.null(x$natural_se$transition)) {
-    cat("\nTransition probabilities (delta-method SE):\n")
+    cat(if (identical(x$method, "tvtp")) {
+      "\nTransition probabilities at the in-sample covariate means (delta-method SE):\n"
+    } else {
+      "\nTransition probabilities (delta-method SE):\n"
+    })
     print(format(x$natural_se$transition, digits = digits))
   }
   if (!is.null(x$diagnostics)) {
-    cat("\nRegime diagnostics (stay prob., expected duration, ergodic prob.):\n")
+    cat(if (identical(x$method, "tvtp")) {
+      "\nRegime diagnostics at the in-sample covariate means (stay prob., expected duration, ergodic prob.):\n"
+    } else {
+      "\nRegime diagnostics (stay prob., expected duration, ergodic prob.):\n"
+    })
     print(format(x$diagnostics, digits = digits))
   }
   invisible(x)
