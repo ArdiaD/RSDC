@@ -106,11 +106,53 @@
 
 # ---- methods ---------------------------------------------------------------
 
-#' @describeIn rsdc_estimate Compact printer for a fitted model.
-#' @param x An object of class \code{"rsdc_fit"}.
-#' @param object An object of class \code{"rsdc_fit"}.
+#' Methods for fitted RSDC models
+#'
+#' A model fitted with \code{\link{rsdc_estimate}} is returned as an object of
+#' class \code{"rsdc_fit"}, which supports the standard fitted-model generics —
+#' so it can be used like any other fitted model in R (\code{lm}, \code{glm},
+#' \dots): print and summarize it, extract coefficients, standard errors and
+#' confidence intervals, compute \code{AIC}/\code{BIC}, forecast, simulate new
+#' data from the fitted process, and plot the regime probabilities. Each method
+#' is described in the \emph{Functions} section below.
+#'
+#' @param x,object An object of class \code{"rsdc_fit"}, as returned by
+#'   \code{\link{rsdc_estimate}}.
 #' @param digits Number of significant digits for printing.
-#' @param ... Further arguments passed to methods (currently unused).
+#' @param ... Further arguments passed to methods (\code{vcov} forwards \code{B}
+#'   and \code{seed} to \code{\link{rsdc_bootstrap}} when \code{type = "bootstrap"};
+#'   otherwise unused).
+#'
+#' @returns \code{print} and \code{plot} return \code{x} invisibly. \code{coef},
+#'   \code{nobs}, \code{logLik}, \code{vcov} and \code{confint} return the usual
+#'   objects of those generics. \code{summary} returns a \code{"summary.rsdc_fit"}
+#'   list with a coefficient table (estimate, SE, z, p) and regime diagnostics.
+#'   \code{predict} returns the result of \code{\link{rsdc_forecast}}.
+#'   \code{simulate} returns a list with \code{states} and \code{observations}.
+#'
+#' @examples
+#' \donttest{
+#' # Two persistent regimes: low (0.1) vs high (0.8) correlation
+#' sim <- rsdc_simulate(n = 500, X = matrix(1, 500, 1),
+#'                      beta = matrix(qlogis(0.9), 2, 1),
+#'                      mu = matrix(0, 2, 2),
+#'                      sigma = array(c(1, 0.1, 0.1, 1,
+#'                                      1, 0.8, 0.8, 1), c(2, 2, 2)),
+#'                      N = 2, seed = 2)
+#' fit <- rsdc_estimate("noX", residuals = sim$observations, N = 2)
+#' summary(fit)
+#' confint(fit)
+#' c(AIC = AIC(fit), BIC = BIC(fit))
+#' plot(fit)
+#' }
+#'
+#' @seealso \code{\link{rsdc_estimate}} for fitting;
+#'   \code{\link{rsdc_forecast}}, \code{\link{rsdc_bootstrap}}.
+#'
+#' @name rsdc_fit-methods
+NULL
+
+#' @describeIn rsdc_fit-methods Compact printer for a fitted model.
 #' @exportS3Method print rsdc_fit
 print.rsdc_fit <- function(x, digits = 4, ...) {
   cat(sprintf("RSDC fit: method = \"%s\", N = %d regime(s), K = %d series, T = %d\n",
@@ -132,15 +174,15 @@ print.rsdc_fit <- function(x, digits = 4, ...) {
   invisible(x)
 }
 
-#' @describeIn rsdc_estimate Coefficient vector (named, in objective order).
+#' @describeIn rsdc_fit-methods Coefficient vector (named, in objective order).
 #' @exportS3Method coef rsdc_fit
 coef.rsdc_fit <- function(object, ...) object$coefficients
 
-#' @describeIn rsdc_estimate Number of observations used in estimation.
+#' @describeIn rsdc_fit-methods Number of observations used in estimation.
 #' @exportS3Method nobs rsdc_fit
 nobs.rsdc_fit <- function(object, ...) object$nobs
 
-#' @describeIn rsdc_estimate Log-likelihood (carries \code{df} and \code{nobs} so
+#' @describeIn rsdc_fit-methods Log-likelihood (carries \code{df} and \code{nobs} so
 #'   \code{stats::AIC}/\code{BIC} work out of the box).
 #' @exportS3Method logLik rsdc_fit
 logLik.rsdc_fit <- function(object, ...) {
@@ -151,7 +193,7 @@ logLik.rsdc_fit <- function(object, ...) {
   val
 }
 
-#' @describeIn rsdc_estimate Variance-covariance matrix of the estimates. The
+#' @describeIn rsdc_fit-methods Variance-covariance matrix of the estimates. The
 #'   \emph{numerical} estimators are \code{type = "hessian"} (default, inverse
 #'   observed information), \code{"opg"} (outer product of gradients) and
 #'   \code{"sandwich"} (QML/robust \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}); the
@@ -176,7 +218,7 @@ vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich", "bootst
   V
 }
 
-#' @describeIn rsdc_estimate Wald confidence intervals from the chosen covariance
+#' @describeIn rsdc_fit-methods Wald confidence intervals from the chosen covariance
 #'   (numerical or \code{"bootstrap"}). For bootstrap \emph{percentile} intervals
 #'   instead of Wald, use \code{\link{rsdc_bootstrap}} directly.
 #' @param parm Vector of parameter names/indices (default: all).
@@ -197,7 +239,7 @@ confint.rsdc_fit <- function(object, parm, level = 0.95,
   ci
 }
 
-#' @describeIn rsdc_estimate Summary with a coefficient table (estimate, SE, z, p).
+#' @describeIn rsdc_fit-methods Summary with a coefficient table (estimate, SE, z, p).
 #' @exportS3Method summary rsdc_fit
 #' @importFrom stats pnorm
 summary.rsdc_fit <- function(object, ...) {
@@ -247,11 +289,17 @@ print.summary.rsdc_fit <- function(x, digits = 4, ...) {
   invisible(x)
 }
 
-#' @describeIn rsdc_estimate Forecast from a fitted model (wraps
+#' @describeIn rsdc_fit-methods Forecast from a fitted model (wraps
 #'   \code{\link{rsdc_forecast}}); supply the residuals, conditional volatilities,
 #'   and (for \code{"tvtp"}) the covariate matrix \code{X}.
+#' @param residuals Numeric matrix \eqn{T \times K} of standardized residuals
+#'   on which the forecast filter is run.
 #' @param sigma_matrix Numeric matrix of conditional standard deviations.
 #' @param value_cols Columns of \code{sigma_matrix} giving the asset order.
+#' @param X Covariate matrix \eqn{T \times p} (required for a \code{"tvtp"} fit;
+#'   \code{simulate} uses its row count as the simulation length).
+#' @param out_of_sample Logical; passed to \code{\link{rsdc_forecast}}
+#'   (70/30 split).
 #' @exportS3Method predict rsdc_fit
 predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
                              X = NULL, out_of_sample = FALSE, ...) {
@@ -260,7 +308,7 @@ predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
                 value_cols = value_cols, out_of_sample = out_of_sample, ...)
 }
 
-#' @describeIn rsdc_estimate Simulate from a fitted model. For \code{"tvtp"} supply
+#' @describeIn rsdc_fit-methods Simulate from a fitted model. For \code{"tvtp"} supply
 #'   a covariate matrix \code{X} (its row count sets the length); for \code{"noX"}
 #'   the fixed transition matrix is used; for \code{"const"} a single regime is drawn.
 #' @param nsim Unused (kept for generic compatibility; one path is returned).
@@ -300,7 +348,7 @@ simulate.rsdc_fit <- function(object, nsim = 1, seed = NULL, X = NULL, n = NULL,
   list(states = states, observations = obs, transition_matrices = NULL)
 }
 
-#' @describeIn rsdc_estimate Plot the smoothed regime probabilities (one panel per
+#' @describeIn rsdc_fit-methods Plot the smoothed regime probabilities (one panel per
 #'   regime) for a fitted \code{"noX"}/\code{"tvtp"} model. \code{which = "filtered"}
 #'   plots filtered probabilities instead.
 #' @param which Either \code{"smoothed"} (default) or \code{"filtered"}.

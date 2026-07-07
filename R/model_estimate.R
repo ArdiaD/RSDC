@@ -673,8 +673,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals/returns.
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
-#' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to
-#'   estimation (in \code{predict()}, passed on to \code{\link{rsdc_forecast}}).
+#' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
 #' @param control Optional list forwarded to the backends and optimizers:
 #'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer
 #'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
@@ -706,9 +705,12 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'   \item{\code{npar}, \code{nobs}}{Number of free parameters and observations used in estimation.}
 #'   \item{\code{method}, \code{N}, \code{K}, \code{p}, \code{call}}{Fit metadata.}
 #' }
-#' Standard methods are provided: \code{\link[=print.rsdc_fit]{print}}, \code{summary},
-#' \code{coef}, \code{logLik} (so \code{\link[stats]{AIC}}/\code{\link[stats]{BIC}} work),
-#' \code{nobs}, \code{vcov}, \code{confint}, \code{predict}, and \code{simulate}.
+#' The returned object supports the standard fitted-model generics —
+#' \code{print}, \code{summary}, \code{coef}, \code{logLik} (so
+#' \code{\link[stats]{AIC}}/\code{\link[stats]{BIC}} work), \code{nobs},
+#' \code{vcov}, \code{confint}, \code{predict}, \code{simulate}, and
+#' \code{plot} — documented together in \link[=rsdc_fit-methods]{Methods for
+#' fitted RSDC models}.
 #'
 #' @details
 #' \itemize{
@@ -742,9 +744,9 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' coef(fit_tvtp)
 #' }
 #'
-#' @seealso \code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
+#' @seealso \link[=rsdc_fit-methods]{Methods for fitted RSDC models},
+#'   \code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
 #'
-#' @order 1
 #' @export
 rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           residuals, N = 2, X = NULL,
