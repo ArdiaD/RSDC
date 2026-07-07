@@ -743,6 +743,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'
 #' @seealso \code{\link{rsdc_hamilton}} and \code{\link{rsdc_likelihood}}.
 #'
+#' @order 1
 #' @export
 rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
                           residuals, N = 2, X = NULL,
