@@ -250,11 +250,8 @@ print.summary.rsdc_fit <- function(x, digits = 4, ...) {
 #' @describeIn rsdc_estimate Forecast from a fitted model (wraps
 #'   \code{\link{rsdc_forecast}}); supply the residuals, conditional volatilities,
 #'   and (for \code{"tvtp"}) the covariate matrix \code{X}.
-#' @param residuals Numeric matrix of standardized residuals for the forecast.
 #' @param sigma_matrix Numeric matrix of conditional standard deviations.
 #' @param value_cols Columns of \code{sigma_matrix} giving the asset order.
-#' @param X Covariate matrix (required for \code{method = "tvtp"}).
-#' @param out_of_sample Logical; passed to \code{\link{rsdc_forecast}}.
 #' @exportS3Method predict rsdc_fit
 predict.rsdc_fit <- function(object, residuals, sigma_matrix, value_cols,
                              X = NULL, out_of_sample = FALSE, ...) {

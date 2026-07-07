@@ -60,13 +60,14 @@ rsdc_estimate(
 \arguments{
 \item{method}{Character. One of \code{"tvtp"}, \code{"noX"}, \code{"const"}.}
 
-\item{residuals}{Numeric matrix of standardized residuals for the forecast.}
+\item{residuals}{Numeric matrix \eqn{T \times K}. Typically standardized residuals/returns.}
 
 \item{N}{Integer. Number of regimes. Ignored when \code{method = "const"}.}
 
-\item{X}{Covariate matrix (required for \code{method = "tvtp"}).}
+\item{X}{Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).}
 
-\item{out_of_sample}{Logical; passed to \code{\link{rsdc_forecast}}.}
+\item{out_of_sample}{Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to
+estimation (in \code{predict()}, passed on to \code{\link{rsdc_forecast}}).}
 
 \item{control}{Optional list forwarded to the backends and optimizers:
 \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer

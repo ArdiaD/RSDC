@@ -673,7 +673,8 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param residuals Numeric matrix \eqn{T \times K}. Typically standardized residuals/returns.
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
-#' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
+#' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to
+#'   estimation (in \code{predict()}, passed on to \code{\link{rsdc_forecast}}).
 #' @param control Optional list forwarded to the backends and optimizers:
 #'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer
 #'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
