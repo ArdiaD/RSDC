@@ -20,9 +20,16 @@
 #' @seealso \code{\link{rsdc_forecast}} for marginal regime probabilities.
 #' @examples
 #' \donttest{
-#' y <- scale(matrix(rnorm(200 * 2), 200, 2))
-#' fit <- rsdc_estimate("noX", residuals = y, N = 2)
-#' table(rsdc_viterbi(fit))
+#' # Two persistent regimes: low (0.1) vs high (0.8) correlation
+#' sim <- rsdc_simulate(n = 500, X = matrix(1, 500, 1),
+#'                      beta = matrix(qlogis(0.9), 2, 1),
+#'                      mu = matrix(0, 2, 2),
+#'                      sigma = array(c(1, 0.1, 0.1, 1,
+#'                                      1, 0.8, 0.8, 1), c(2, 2, 2)),
+#'                      N = 2, seed = 2)
+#' fit <- rsdc_estimate("noX", residuals = sim$observations, N = 2)
+#' # Decoded path recovers the simulated regimes
+#' table(viterbi = rsdc_viterbi(fit), truth = sim$states)
 #' }
 #' @export
 rsdc_viterbi <- function(object, residuals = NULL, X = NULL) {

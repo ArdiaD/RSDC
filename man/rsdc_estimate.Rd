@@ -186,13 +186,19 @@ plots filtered probabilities instead.
 }}
 \examples{
 \donttest{
-y <- scale(matrix(rnorm(100 * 3), 100, 3))
-fit <- rsdc_estimate("noX", residuals = y, N = 2)
+# Two persistent regimes: low (0.1) vs high (0.8) correlation
+sim <- rsdc_simulate(n = 500, X = matrix(1, 500, 1),
+                     beta = matrix(qlogis(0.9), 2, 1),
+                     mu = matrix(0, 2, 2),
+                     sigma = array(c(1, 0.1, 0.1, 1,
+                                     1, 0.8, 0.8, 1), c(2, 2, 2)),
+                     N = 2, seed = 2)
+fit <- rsdc_estimate("noX", residuals = sim$observations, N = 2)
 print(fit)
 summary(fit)
 c(AIC = AIC(fit), BIC = BIC(fit))
-X <- cbind(1, scale(seq_len(nrow(y))))
-fit_tvtp <- rsdc_estimate("tvtp", residuals = y, N = 2, X = X)
+X <- cbind(1, scale(seq_len(nrow(sim$observations))))
+fit_tvtp <- rsdc_estimate("tvtp", residuals = sim$observations, N = 2, X = X)
 coef(fit_tvtp)
 }
 

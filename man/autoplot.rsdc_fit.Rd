@@ -21,8 +21,14 @@ Requires the suggested \pkg{ggplot2} package.
 \examples{
 \donttest{
 if (requireNamespace("ggplot2", quietly = TRUE)) {
-  y <- scale(matrix(rnorm(200 * 2), 200, 2))
-  fit <- rsdc_estimate("noX", residuals = y, N = 2)
+  # Two persistent regimes: low (0.1) vs high (0.8) correlation
+  sim <- rsdc_simulate(n = 500, X = matrix(1, 500, 1),
+                       beta = matrix(qlogis(0.9), 2, 1),
+                       mu = matrix(0, 2, 2),
+                       sigma = array(c(1, 0.1, 0.1, 1,
+                                       1, 0.8, 0.8, 1), c(2, 2, 2)),
+                       N = 2, seed = 2)
+  fit <- rsdc_estimate("noX", residuals = sim$observations, N = 2)
   ggplot2::autoplot(fit)
 }
 }

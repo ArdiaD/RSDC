@@ -48,6 +48,24 @@
 #'
 #' \insertRef{pelletier2006regime}{RSDC}
 #'
+#' @examples
+#' \donttest{
+#' # Quickstart: simulate two correlation regimes, fit, and inspect the fit
+#' sim <- rsdc_simulate(n = 500, X = matrix(1, 500, 1),
+#'                      beta = matrix(qlogis(0.9), 2, 1),
+#'                      mu = matrix(0, 2, 2),
+#'                      sigma = array(c(1, 0.1, 0.1, 1,
+#'                                      1, 0.8, 0.8, 1), c(2, 2, 2)),
+#'                      N = 2, seed = 2)
+#' fit <- rsdc_estimate("noX", residuals = sim$observations, N = 2)
+#' summary(fit)
+#' c(AIC = AIC(fit), BIC = BIC(fit))
+#' # Most likely regime path
+#' table(rsdc_viterbi(fit))
+#' # See the vignettes for the full TVTP and portfolio workflow:
+#' # browseVignettes("RSDC")
+#' }
+#'
 #' @useDynLib RSDC, .registration = TRUE
 #' @importFrom Rdpack reprompt
 #' @importFrom Rcpp sourceCpp
