@@ -1,4 +1,19 @@
 # Changes in Version 1.6-0 (DA,BS,RN)
+- New `rsdc_starts()`: data-driven warm starts for high-dimensional problems.
+  In moderate dimensions the DEoptim global search works well, but for K >= 5
+  a random vector of pairwise correlations is almost never positive definite,
+  so its initial population contains no feasible point. `rsdc_starts()` builds
+  feasible starting vectors from the empirical correlations of low/…/high
+  average-correlation sub-periods (positive definite by construction), with
+  `n_starts` shrinkage variants as protection against local optima.
+- `rsdc_estimate()` accepts an `rsdc_starts` object via `control$start`: each
+  start is refined by the local optimiser (the global search is skipped), the
+  highest-likelihood fit is kept, and the returned object carries
+  `start_logliks` (spread across starts) and `start_pars` (per-start optima).
+  `control$cores` parallelises both multi-start forms (`n_starts` seeds or
+  `rsdc_starts` warm starts); for a plain single fit it is forwarded to the
+  backends, where `cores > 1` enables parallel DEoptim (`parallelType = 1`),
+  as before.
 - New `cores` argument for `rsdc_bootstrap()` and `rsdc_corr_bands()`:
   task-level parallelism via the base `parallel` package (forked workers on
   Unix-alikes, a PSOCK cluster on Windows). All random draws are generated up

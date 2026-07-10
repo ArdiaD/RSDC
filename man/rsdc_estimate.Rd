@@ -36,7 +36,15 @@ seed; \code{n_starts > 1} is therefore primarily a \strong{stability
 diagnostic} (not a replacement for the global search): the returned object
 carries \code{start_logliks} (one log-likelihood per start) so you can check
 whether the optimum is reproducible across seeds. A warm start
-(\code{start}) disables multi-start.}
+(\code{start}) disables multi-start. \code{start} accepts either a numeric
+vector in the objective's packing order (a single warm start; the global
+search is skipped) or an \code{\link{rsdc_starts}} object (data-driven
+multi-start for high-dimensional problems: each start is refined locally,
+the highest-likelihood fit is kept, and the object carries
+\code{start_logliks} and \code{start_pars}). \code{cores} (default 1)
+runs the multi-start fits in parallel via the \pkg{parallel} package;
+results are identical for any value because each fit is deterministic
+given its start or seed.}
 }
 \value{
 An object of class \code{"rsdc_fit"}: a list with components

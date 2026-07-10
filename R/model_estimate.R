@@ -695,7 +695,15 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'   diagnostic} (not a replacement for the global search): the returned object
 #'   carries \code{start_logliks} (one log-likelihood per start) so you can check
 #'   whether the optimum is reproducible across seeds. A warm start
-#'   (\code{start}) disables multi-start.
+#'   (\code{start}) disables multi-start. \code{start} accepts either a numeric
+#'   vector in the objective's packing order (a single warm start; the global
+#'   search is skipped) or an \code{\link{rsdc_starts}} object (data-driven
+#'   multi-start for high-dimensional problems: each start is refined locally,
+#'   the highest-likelihood fit is kept, and the object carries
+#'   \code{start_logliks} and \code{start_pars}). \code{cores} (default 1)
+#'   runs the multi-start fits in parallel via the \pkg{parallel} package;
+#'   results are identical for any value because each fit is deterministic
+#'   given its start or seed.
 #'
 #' @return An object of class \code{"rsdc_fit"}: a list with components
 #' \describe{
@@ -807,29 +815,80 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
   # several seeds, keep the highest-likelihood fit, and record the spread of
   # log-likelihoods so users can judge whether the optimum is stable (a guard
   # against local optima). A warm start (control$start) disables multi-start.
+  # Alternatively, control$start may be an "rsdc_starts" object (data-driven
+  # warm starts for high-dimensional problems, see rsdc_starts()): each start
+  # is refined by the local optimiser (the global search is skipped) and the
+  # highest-likelihood fit is kept. control$cores parallelises whichever
+  # multi-start form is active; the backends never see it there (no nested
+  # parallelism). For a plain single fit, cores is forwarded to the backends,
+  # where cores > 1 enables DEoptim's parallel evaluation (parallelType = 1),
+  # preserving the pre-1.6-0 behaviour.
   n_starts <- if (!is.null(control$n_starts)) as.integer(control$n_starts) else 1L
   base_seed <- if (!is.null(control$seed)) control$seed else 123L
-  start_logliks <- NULL
-  if (n_starts > 1L && is.null(control$start)) {
+  cores <- if (!is.null(control$cores)) as.integer(control$cores) else 1L
+  start_logliks <- NULL; start_pars <- NULL
+  if (inherits(control$start, "rsdc_starts")) {
+    st <- control$start
+    if (!identical(st$method, method))
+      stop("The rsdc_starts object was built for method = '", st$method,
+           "', not '", method, "'.")
+    if (method != "const" && st$N != N)
+      stop("The rsdc_starts object was built for N = ", st$N, ", not N = ", N, ".")
+    if (st$K != ncol(residuals))
+      stop("The rsdc_starts object was built for K = ", st$K, " series, not ",
+           ncol(residuals), ".")
+    if (method == "tvtp" && !is.na(st$p) && st$p != ncol(X))
+      stop("The rsdc_starts object was built for p = ", st$p,
+           " covariates, not ", ncol(X), ".")
+    keep_starts <- which(is.finite(st$loglik0))
+    if (!length(keep_starts))
+      stop("No feasible start in the rsdc_starts object (all loglik0 infinite).")
+    search_ctrl <- control; search_ctrl$compute_se <- FALSE
+    search_ctrl$n_starts <- NULL; search_ctrl$cores <- NULL
+    fits <- .rsdc_lapply(keep_starts, function(i) {
+      sc <- search_ctrl; sc$start <- st$starts[i, ]
+      tryCatch(fit_once(sc), error = function(e) NULL)
+    }, cores = cores)
+    ok <- !vapply(fits, is.null, logical(1))
+    if (!any(ok)) stop("All warm starts failed to converge.")
+    fits <- fits[ok]
+    start_logliks <- vapply(fits, function(f) f$log_likelihood, numeric(1))
+    start_pars <- t(vapply(fits, function(f) f$par,
+                           numeric(length(fits[[1]]$par))))
+    best <- which.max(start_logliks)
+    # Recompute the winning fit with the user's compute_se setting,
+    # warm-starting the local optimiser at the winner's parameters.
+    final_ctrl <- control; final_ctrl$n_starts <- NULL; final_ctrl$cores <- NULL
+    final_ctrl$start <- fits[[best]]$par
+    fit <- fit_once(final_ctrl)
+    n_starts <- length(start_logliks)
+  } else if (n_starts > 1L && is.null(control$start)) {
     seeds <- base_seed + seq_len(n_starts) - 1L
-    search_ctrl <- control; search_ctrl$compute_se <- FALSE; search_ctrl$n_starts <- NULL
-    fits <- lapply(seeds, function(s) { search_ctrl$seed <- s; fit_once(search_ctrl) })
+    search_ctrl <- control; search_ctrl$compute_se <- FALSE
+    search_ctrl$n_starts <- NULL; search_ctrl$cores <- NULL
+    fits <- .rsdc_lapply(seeds, function(s) {
+      search_ctrl$seed <- s; fit_once(search_ctrl)
+    }, cores = cores)
     start_logliks <- vapply(fits, function(f) f$log_likelihood, numeric(1))
     best <- which.max(start_logliks)
     # Recompute the winning fit with the user's compute_se setting, warm-starting the
     # local optimiser at the winner's parameters (avoids repeating the global search).
-    final_ctrl <- control; final_ctrl$n_starts <- NULL
+    final_ctrl <- control; final_ctrl$n_starts <- NULL; final_ctrl$cores <- NULL
     final_ctrl$seed <- seeds[best]; final_ctrl$start <- fits[[best]]$par
     fit <- fit_once(final_ctrl)
   } else {
     fc <- control; fc$n_starts <- NULL
-    fit <- fit_once(fc)
+    fit <- fit_once(fc)   # cores stays: backends use it for parallel DEoptim
   }
 
   out <- .rsdc_finalize(fit, method = method, N = N, K = ncol(residuals), p = p_x, call = cl)
   if (!is.null(start_logliks)) {
     out$n_starts      <- n_starts
     out$start_logliks <- start_logliks
+  }
+  if (!is.null(start_pars)) {
+    colnames(start_pars) <- names(out$coefficients)
+    out$start_pars <- start_pars
   }
   out
 }
