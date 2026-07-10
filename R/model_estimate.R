@@ -683,27 +683,55 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #' @param N Integer. Number of regimes. Ignored when \code{method = "const"}.
 #' @param X Numeric matrix \eqn{T \times p} of exogenous covariates (required for \code{"tvtp"}).
 #' @param out_of_sample Logical. If \code{TRUE}, a fixed 70/30 split is applied prior to estimation.
-#' @param control Optional list forwarded to the backends and optimizers:
-#'   \code{seed} (default 123) and \code{do_trace} (default \code{FALSE}); optimizer
-#'   settings \code{itermax}, \code{NP}, \code{parallelType}, \code{steptol} (\pkg{DEoptim})
-#'   and \code{maxit} (\code{optim}); \code{compute_se} (default \code{TRUE}) to
-#'   toggle the observed-information standard errors; and \code{n_starts}
-#'   (default 1) to repeat the global+local search from several seeds
-#'   (\code{seed, seed+1, \dots}) and keep the highest-likelihood fit. Because
-#'   \pkg{DEoptim} is a \emph{stochastic} global search, its result depends on the
-#'   seed; \code{n_starts > 1} is therefore primarily a \strong{stability
-#'   diagnostic} (not a replacement for the global search): the returned object
-#'   carries \code{start_logliks} (one log-likelihood per start) so you can check
-#'   whether the optimum is reproducible across seeds. A warm start
-#'   (\code{start}) disables multi-start. \code{start} accepts either a numeric
-#'   vector in the objective's packing order (a single warm start; the global
-#'   search is skipped) or an \code{\link{rsdc_starts}} object (data-driven
-#'   multi-start for high-dimensional problems: each start is refined locally,
-#'   the highest-likelihood fit is kept, and the object carries
-#'   \code{start_logliks} and \code{start_pars}). \code{cores} (default 1)
-#'   runs the multi-start fits in parallel via the \pkg{parallel} package;
-#'   results are identical for any value because each fit is deterministic
-#'   given its start or seed.
+#' @param control Optional named list of estimation settings, forwarded to the
+#'   backends and optimizers. Any subset of the following elements may be
+#'   supplied (defaults in parentheses):
+#'   \describe{
+#'     \item{\code{start} (\code{NULL})}{Warm start; skips the \pkg{DEoptim}
+#'       global search. Two forms are accepted. A \emph{numeric vector} in the
+#'       objective's packing order (see \code{\link{rsdc_likelihood}}) refines
+#'       a single point locally — e.g. re-examine an earlier optimum with
+#'       \code{control = list(start = coef(fit0))}. An
+#'       \code{\link{rsdc_starts}} \emph{object} runs a data-driven
+#'       multi-start instead: each start is refined locally, the
+#'       highest-likelihood fit is kept, and the fit carries
+#'       \code{start_logliks} and \code{start_pars}. This is the recommended
+#'       route in higher dimensions (\eqn{K \ge 5}), where the global search
+#'       cannot find a positive-definite starting point:
+#'       \code{st <- rsdc_starts(y, N = 2, method = "noX")} then
+#'       \code{control = list(start = st, cores = 4)}. A warm start disables
+#'       \code{n_starts}.}
+#'     \item{\code{n_starts} (\code{1})}{Number of independent global+local
+#'       searches from seeds \code{seed, seed + 1, \dots}, keeping the
+#'       highest-likelihood fit: \code{control = list(n_starts = 5)}. Because
+#'       \pkg{DEoptim} is a \emph{stochastic} global search, this is primarily
+#'       a \strong{stability diagnostic} (not a replacement for the global
+#'       search): inspect \code{fit$start_logliks} to check that the optimum
+#'       is reproducible across seeds.}
+#'     \item{\code{cores} (\code{1})}{Parallel workers, via the base
+#'       \pkg{parallel} package (forked on Unix, PSOCK cluster on Windows).
+#'       With either multi-start form, the starts are fitted in parallel —
+#'       \code{control = list(start = st, cores = 4)} — and the result is
+#'       identical for any value, because each fit is deterministic given its
+#'       start or seed; only the wall time changes. For a plain single fit,
+#'       \code{cores > 1} instead enables \pkg{DEoptim}'s parallel evaluation
+#'       of the population (\code{parallelType = 1}).}
+#'     \item{\code{seed} (\code{123})}{RNG seed of the stochastic \pkg{DEoptim}
+#'       search: \code{control = list(seed = 42)}. Unused when a warm start
+#'       skips the global search.}
+#'     \item{\code{compute_se} (\code{TRUE})}{Compute observed-information
+#'       standard errors at the optimum. Disable for speed inside loops
+#'       (bootstraps, searches): \code{control = list(compute_se = FALSE)}.}
+#'     \item{\code{itermax} (\code{500}), \code{NP} (\code{10 x} npar),
+#'       \code{steptol} (\code{50}), \code{parallelType} (\code{0})}{Budget of
+#'       the \pkg{DEoptim} global search: maximum generations, population
+#'       size, early stop after \code{steptol} stagnant generations, and
+#'       \pkg{DEoptim}'s own parallel mode. E.g. a quick exploratory fit:
+#'       \code{control = list(itermax = 100, NP = 200)}.}
+#'     \item{\code{maxit} (\code{1000})}{Maximum iterations of the local
+#'       L-BFGS-B refinement (\code{\link[stats]{optim}}).}
+#'     \item{\code{do_trace} (\code{FALSE})}{Print optimizer progress.}
+#'   }
 #'
 #' @return An object of class \code{"rsdc_fit"}: a list with components
 #' \describe{
