@@ -1,3 +1,12 @@
+# Changes in Version 1.6-0 (DA,BS,RN)
+- Bug fix: the estimation backends no longer call `set.seed()` when a warm
+  start skips the global search. Previously every warm-started refit reset the
+  global RNG stream, so `rsdc_bootstrap()` — which interleaves simulation and
+  warm-started re-estimation — produced nearly identical replicates from the
+  second one on, drastically understating bootstrap standard errors and
+  intervals (also via `vcov(type = "bootstrap")` and
+  `confint(type = "bootstrap")`).
+
 # Changes in Version 1.5-0 (DA,BS,RN)
 - Bug fix (audit): `rsdc_forecast()` now returns a scalar `NA` BIC (instead of a
   silent zero-length `numeric(0)`) when `final_params$log_likelihood` is missing.

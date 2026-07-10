@@ -105,8 +105,10 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     X_optim <- X
   }
 
-  # Global search (skipped when a warm start is supplied)
-  set.seed(con$seed)
+  # Global search (skipped when a warm start is supplied). The RNG is seeded
+  # only when the stochastic search actually runs, so warm-started refits do
+  # not reset the caller's RNG stream (essential for the bootstrap, which
+  # interleaves simulation and warm-started re-estimation).
   if (!is.null(con$start)) {
     if (length(con$start) != length(bounds$lower))
       stop("control$start must have length ", length(bounds$lower), " for this model.")
@@ -119,6 +121,7 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     bounds$lower <- pmin(bounds$lower, de_best)
     bounds$upper <- pmax(bounds$upper, de_best)
   } else {
+    set.seed(con$seed)
     results <- DEoptim::DEoptim(
       fn = rsdc_likelihood,
       lower = bounds$lower,
@@ -355,7 +358,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     y_oos   <- NULL
   }
 
-  set.seed(con$seed)
+  # RNG seeded only when the stochastic global search runs (see f_optim).
   if (!is.null(con$start)) {
     if (length(con$start) != length(bounds$lower))
       stop("control$start must have length ", length(bounds$lower), " for this model.")
@@ -369,6 +372,7 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     bounds$lower <- pmin(bounds$lower, de_best)
     bounds$upper <- pmax(bounds$upper, de_best)
   } else {
+    set.seed(con$seed)
     de_result <- DEoptim::DEoptim(
       fn = rsdc_likelihood,
       lower = bounds$lower,
@@ -600,13 +604,14 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     y_oos <- NULL
   }
 
-  # Fit on IS only
-  set.seed(con$seed)
+  # Fit on IS only. RNG seeded only when the stochastic global search runs
+  # (see f_optim).
   if (!is.null(con$start)) {
     if (length(con$start) != n_rho)
       stop("control$start must have length ", n_rho, " for the constant model.")
     de_best <- con$start
   } else {
+    set.seed(con$seed)
     de_result <- DEoptim::DEoptim(
       fn = neg_loglik_const,
       lower = rep(-1, n_rho),

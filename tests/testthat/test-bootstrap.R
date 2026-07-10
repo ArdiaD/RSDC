@@ -30,3 +30,13 @@ test_that("rsdc_bootstrap works for noX (fixed transition matrix)", {
   expect_equal(length(bs$se), fit$npar)
   expect_true(all(is.finite(bs$se)))
 })
+
+test_that("bootstrap replicates are distinct (RNG regression, 1.6-0 fix)", {
+  set.seed(11)
+  y <- scale(matrix(rnorm(200 * 2), 200, 2))
+  fit <- suppressWarnings(rsdc_estimate("const", residuals = y))
+  bs <- suppressWarnings(rsdc_bootstrap(fit, B = 6, seed = 3))
+  # before the fix, replicates 2..B were identical: every warm-started refit
+  # called set.seed() and so reset the global RNG stream between simulations
+  expect_gt(nrow(unique(round(bs$replicates, 10))), 2L)
+})
