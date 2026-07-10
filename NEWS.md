@@ -1,4 +1,10 @@
 # Changes in Version 1.6-0 (DA,BS,RN)
+- New `cores` argument for `rsdc_bootstrap()` and `rsdc_corr_bands()`:
+  task-level parallelism via the base `parallel` package (forked workers on
+  Unix-alikes, a PSOCK cluster on Windows). All random draws are generated up
+  front from one uninterrupted RNG stream and each parallelised task is
+  deterministic given its inputs, so results are identical for any number of
+  cores; only the wall time changes.
 - Bug fix: the estimation backends no longer call `set.seed()` when a warm
   start skips the global search. Previously every warm-started refit reset the
   global RNG stream, so `rsdc_bootstrap()` — which interleaves simulation and

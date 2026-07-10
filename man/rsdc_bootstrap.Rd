@@ -4,7 +4,7 @@
 \alias{rsdc_bootstrap}
 \title{Parametric bootstrap standard errors for a fitted RSDC model}
 \usage{
-rsdc_bootstrap(object, B = 199, X = NULL, seed = NULL, level = 0.95)
+rsdc_bootstrap(object, B = 199, X = NULL, seed = NULL, level = 0.95, cores = 1)
 }
 \arguments{
 \item{object}{An object of class \code{"rsdc_fit"}.}
@@ -16,6 +16,11 @@ rsdc_bootstrap(object, B = 199, X = NULL, seed = NULL, level = 0.95)
 \item{seed}{Optional integer seed for reproducibility.}
 
 \item{level}{Confidence level for the percentile intervals (default 0.95).}
+
+\item{cores}{Integer (default 1). Number of cores used to re-estimate the
+replicates in parallel (via the \pkg{parallel} package). All \code{B}
+data sets are simulated first, from a single RNG stream, so the result
+is identical for any number of cores.}
 }
 \value{
 A list with \code{replicates} (\eqn{B' \times} npar matrix of successful

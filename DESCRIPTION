@@ -23,6 +23,7 @@ Imports:
     numDeriv,
     generics,
     graphics,
+    parallel,
     stats,
     utils,
     Rcpp

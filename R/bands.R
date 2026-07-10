@@ -31,6 +31,10 @@
 #' @param B Integer. Number of parameter draws (default \code{500}).
 #' @param level Confidence level for the pointwise band (default \code{0.95}).
 #' @param seed Optional integer seed for reproducibility.
+#' @param cores Integer (default 1). Number of cores used to rerun the filter
+#'   over the draws in parallel (via the \pkg{parallel} package). All draws
+#'   are generated up front, so the result is identical for any number of
+#'   cores.
 #'
 #' @returns A list with one element per correlation pair
 #'   (\eqn{C = K(K-1)/2} of them), each a \eqn{T \times 3} matrix with columns
@@ -54,7 +58,7 @@
 #' @importFrom stats quantile
 #' @export
 rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
-                            level = 0.95, seed = NULL) {
+                            level = 0.95, seed = NULL, cores = 1) {
   if (!inherits(object, "rsdc_fit")) stop("object must be an 'rsdc_fit'.")
   if (!is.numeric(B) || length(B) != 1L || B < 2) stop("B must be a single integer >= 2.")
   if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
@@ -90,8 +94,8 @@ rsdc_corr_bands <- function(object, residuals = NULL, X = NULL, B = 500L,
   Tn <- ncol(point)
 
   draws <- mvtnorm::rmvnorm(B, mean = par, sigma = V)
-  paths <- vector("list", B)
-  for (b in seq_len(B)) paths[[b]] <- path_of(draws[b, ])
+  paths <- .rsdc_lapply(seq_len(B), function(b) path_of(draws[b, ]),
+                        cores = cores)
   paths <- paths[!vapply(paths, is.null, logical(1))]
   B_used <- length(paths)
   if (B_used < 2L)

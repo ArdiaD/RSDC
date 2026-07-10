@@ -10,7 +10,8 @@ rsdc_corr_bands(
   X = NULL,
   B = 500L,
   level = 0.95,
-  seed = NULL
+  seed = NULL,
+  cores = 1
 )
 }
 \arguments{
@@ -29,6 +30,11 @@ defaults to the matrix stored on the fit.}
 \item{level}{Confidence level for the pointwise band (default \code{0.95}).}
 
 \item{seed}{Optional integer seed for reproducibility.}
+
+\item{cores}{Integer (default 1). Number of cores used to rerun the filter
+over the draws in parallel (via the \pkg{parallel} package). All draws
+are generated up front, so the result is identical for any number of
+cores.}
 }
 \value{
 A list with one element per correlation pair
