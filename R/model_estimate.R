@@ -122,28 +122,20 @@ f_optim <- function(N, residuals, X, out_of_sample = FALSE, control = list()) {
     bounds$upper <- pmax(bounds$upper, de_best)
   } else {
     set.seed(con$seed)
-    results <- DEoptim::DEoptim(
-      fn = rsdc_likelihood,
-      lower = bounds$lower,
-      upper = bounds$upper,
-      control = list(
-        itermax = con$itermax,
-        NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
-        strategy = 2,
-        F = 0.8,
-        CR = 0.9,
-        trace = con$do_trace,
-        parallelType = if (con$cores > 1L) 1L else con$parallelType,
-        packages = if (con$cores > 1L) "RSDC" else character(0),
-        reltol = 1e-8,
-        steptol = con$steptol
-      ),
-      y = y_optim,
-      exog = X_optim,
-      K = K,
-      N = N
-    )
-    de_best <- results$optim$bestmem
+    # Reparameterized global search (1.7-0): DEoptim explores partial
+    # correlations, where the whole box is feasible, instead of the natural
+    # correlations, where nearly no random draw is positive definite for
+    # K >~ 5. Same objective as the refinement below. The returned point is
+    # already L-BFGS-B refined; the optim() call below only polishes it.
+    gs <- .rsdc_theta_search(
+      function(par) rsdc_likelihood(par, y = y_optim, exog = X_optim, K = K, N = N),
+      method = "tvtp", K = K, N = N, p = p,
+      lower = bounds$lower, upper = bounds$upper, con = con)
+    de_best <- gs$par
+    # A softmax-head candidate can sit outside the default box (see the
+    # warm-start branch above): widen just enough to keep it feasible.
+    bounds$lower <- pmin(bounds$lower, de_best)
+    bounds$upper <- pmax(bounds$upper, de_best)
   }
 
   # Optim refinement (fixed residual reference)
@@ -373,20 +365,19 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
     bounds$upper <- pmax(bounds$upper, de_best)
   } else {
     set.seed(con$seed)
-    de_result <- DEoptim::DEoptim(
-      fn = rsdc_likelihood,
-      lower = bounds$lower,
-      upper = bounds$upper,
-      control = list(itermax = con$itermax,
-                     NP = if (is.null(con$NP)) 10 * length(bounds$lower) else con$NP,
-                     strategy = 2, F = 0.8, CR = 0.9,
-                     trace = con$do_trace,
-                     parallelType = if (con$cores > 1L) 1L else con$parallelType,
-                     packages = if (con$cores > 1L) "RSDC" else character(0),
-                     reltol = 1e-8, steptol = con$steptol),
-      y = y_optim, exog = NULL, K = K, N = N
-    )
-    de_best <- de_result$optim$bestmem
+    # Reparameterized global search (1.7-0): partial-correlation blocks and,
+    # for N >= 3, a bounded-softmax transition head (the [0.01, 0.99] box on
+    # the log-odds scale), so every point of the search box is a valid,
+    # non-degenerate model. Same objective as the refinement below.
+    gs <- .rsdc_theta_search(
+      function(par) rsdc_likelihood(par, y = y_optim, exog = NULL, K = K, N = N),
+      method = "noX", K = K, N = N,
+      lower = bounds$lower, upper = bounds$upper, con = con)
+    de_best <- gs$par
+    # A softmax-head candidate can hold transition probabilities below the
+    # 0.01 box edge: widen just enough, as in the warm-start branch above.
+    bounds$lower <- pmin(bounds$lower, de_best)
+    bounds$upper <- pmax(bounds$upper, de_best)
   }
 
   optim_result <- optim(
@@ -612,14 +603,16 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
     de_best <- con$start
   } else {
     set.seed(con$seed)
-    de_result <- DEoptim::DEoptim(
-      fn = neg_loglik_const,
-      lower = rep(-1, n_rho),
-      upper = rep(1, n_rho),
-      control = list(itermax = con$itermax, trace = con$do_trace),
-      y = y_is, K = K
-    )
-    de_best <- de_result$optim$bestmem
+    # Reparameterized global search (1.7-0): the partial-correlation box is
+    # fully feasible, so the search needs no penalty rejections even at
+    # large K. Same objective as the refinement below.
+    gs <- .rsdc_theta_search(
+      function(par) neg_loglik_const(par, y = y_is, K = K),
+      method = "const", K = K, N = 1L,
+      lower = rep(-1, n_rho), upper = rep(1, n_rho),
+      con = list(itermax = con$itermax, NP = NULL, steptol = 50,
+                 maxit = con$maxit, do_trace = con$do_trace))
+    de_best <- gs$par
   }
 
   optim_result <- optim(
@@ -695,27 +688,30 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'       \code{\link{rsdc_starts}} \emph{object} runs a data-driven
 #'       multi-start instead: each start is refined locally, the
 #'       highest-likelihood fit is kept, and the fit carries
-#'       \code{start_logliks} and \code{start_pars}. This is the recommended
-#'       route in higher dimensions (\eqn{K \ge 5}), where the global search
-#'       cannot find a positive-definite starting point:
+#'       \code{start_logliks} and \code{start_pars}. Since 1.7-0 the default
+#'       global search is feasible at any \eqn{K} (partial-correlation
+#'       parameterization); \code{rsdc_starts} remains a fast deterministic
+#'       complement — when both routes agree, the optimum is cross-certified:
 #'       \code{st <- rsdc_starts(y, N = 2, method = "noX")} then
 #'       \code{control = list(start = st, cores = 4)}. A warm start disables
 #'       \code{n_starts}.}
 #'     \item{\code{n_starts} (\code{1})}{Number of independent global+local
 #'       searches from seeds \code{seed, seed + 1, \dots}, keeping the
-#'       highest-likelihood fit: \code{control = list(n_starts = 5)}. Because
-#'       \pkg{DEoptim} is a \emph{stochastic} global search, this is primarily
-#'       a \strong{stability diagnostic} (not a replacement for the global
-#'       search): inspect \code{fit$start_logliks} to check that the optimum
-#'       is reproducible across seeds.}
+#'       highest-likelihood fit. Because \pkg{DEoptim} is a \emph{stochastic}
+#'       global search, a single run can land in a suboptimal basin of a
+#'       multimodal likelihood; independent searches make that failure both
+#'       unlikely and \emph{visible}: with \code{n_starts >= 2} the fit
+#'       carries \code{start_logliks}, and a warning is issued when the best
+#'       value is not replicated by at least two searches.
+#'       \code{control = list(n_starts = 4, cores = 4)} is a good default for
+#'       multimodal surfaces (e.g. \code{"noX"} with \eqn{N \ge 3}) at the
+#'       wall-clock cost of a single search.}
 #'     \item{\code{cores} (\code{1})}{Parallel workers, via the base
 #'       \pkg{parallel} package (forked on Unix, PSOCK cluster on Windows).
 #'       With either multi-start form, the starts are fitted in parallel —
-#'       \code{control = list(start = st, cores = 4)} — and the result is
+#'       \code{control = list(n_starts = 4, cores = 4)} — and the result is
 #'       identical for any value, because each fit is deterministic given its
-#'       start or seed; only the wall time changes. For a plain single fit,
-#'       \code{cores > 1} instead enables \pkg{DEoptim}'s parallel evaluation
-#'       of the population (\code{parallelType = 1}).}
+#'       start or seed; only the wall time changes.}
 #'     \item{\code{seed} (\code{123})}{RNG seed of the stochastic \pkg{DEoptim}
 #'       search: \code{control = list(seed = 42)}. Unused when a warm start
 #'       skips the global search.}
@@ -723,10 +719,9 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
 #'       standard errors at the optimum. Disable for speed inside loops
 #'       (bootstraps, searches): \code{control = list(compute_se = FALSE)}.}
 #'     \item{\code{itermax} (\code{500}), \code{NP} (\code{10 x} npar),
-#'       \code{steptol} (\code{50}), \code{parallelType} (\code{0})}{Budget of
-#'       the \pkg{DEoptim} global search: maximum generations, population
-#'       size, early stop after \code{steptol} stagnant generations, and
-#'       \pkg{DEoptim}'s own parallel mode. E.g. a quick exploratory fit:
+#'       \code{steptol} (\code{50})}{Budget of the \pkg{DEoptim} global
+#'       search: maximum generations, population size, early stop after
+#'       \code{steptol} stagnant generations. E.g. a quick exploratory fit:
 #'       \code{control = list(itermax = 100, NP = 200)}.}
 #'     \item{\code{maxit} (\code{1000})}{Maximum iterations of the local
 #'       L-BFGS-B refinement (\code{\link[stats]{optim}}).}
@@ -899,6 +894,14 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
     }, cores = cores)
     start_logliks <- vapply(fits, function(f) f$log_likelihood, numeric(1))
     best <- which.max(start_logliks)
+    # Replication (agreement) check: at a reproducible optimum, several
+    # independent searches should reach the same maximum. A lone maximum on a
+    # multimodal surface is indistinguishable from a lucky draw.
+    if (sum(start_logliks >= start_logliks[best] - .RSDC_AGREE_TOL) < 2L)
+      warning("The best log-likelihood was reached by only one of ", n_starts,
+              " independent searches; the optimum may not be global. ",
+              "Inspect fit$start_logliks and consider increasing ",
+              "control$n_starts.")
     # Recompute the winning fit with the user's compute_se setting, warm-starting the
     # local optimiser at the winner's parameters (avoids repeating the global search).
     final_ctrl <- control; final_ctrl$n_starts <- NULL; final_ctrl$cores <- NULL

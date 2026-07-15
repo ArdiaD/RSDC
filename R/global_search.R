@@ -23,6 +23,10 @@
 .RSDC_TOP_K     <- 3L     # refined candidates per search
 .RSDC_DIV_DIST  <- 0.10   # min normalized RMS distance between candidates
 .RSDC_LOGIT_BOX <- 4      # |softmax logit| bound for the noX (N >= 3) head
+.RSDC_AGREE_TOL <- 2.5    # log-lik tolerance of the replication (agreement)
+                          # check across independent searches; refits of the
+                          # same optimum from different seeds scatter by
+                          # ~1-2 log-points, so 1.0 would false-alarm
 
 #' Head-block specification for the theta parameterization
 #'

@@ -36,27 +36,30 @@ a single point locally — e.g. re-examine an earlier optimum with
 \code{\link{rsdc_starts}} \emph{object} runs a data-driven
 multi-start instead: each start is refined locally, the
 highest-likelihood fit is kept, and the fit carries
-\code{start_logliks} and \code{start_pars}. This is the recommended
-route in higher dimensions (\eqn{K \ge 5}), where the global search
-cannot find a positive-definite starting point:
+\code{start_logliks} and \code{start_pars}. Since 1.7-0 the default
+global search is feasible at any \eqn{K} (partial-correlation
+parameterization); \code{rsdc_starts} remains a fast deterministic
+complement — when both routes agree, the optimum is cross-certified:
 \code{st <- rsdc_starts(y, N = 2, method = "noX")} then
 \code{control = list(start = st, cores = 4)}. A warm start disables
 \code{n_starts}.}
 \item{\code{n_starts} (\code{1})}{Number of independent global+local
 searches from seeds \code{seed, seed + 1, \dots}, keeping the
-highest-likelihood fit: \code{control = list(n_starts = 5)}. Because
-\pkg{DEoptim} is a \emph{stochastic} global search, this is primarily
-a \strong{stability diagnostic} (not a replacement for the global
-search): inspect \code{fit$start_logliks} to check that the optimum
-is reproducible across seeds.}
+highest-likelihood fit. Because \pkg{DEoptim} is a \emph{stochastic}
+global search, a single run can land in a suboptimal basin of a
+multimodal likelihood; independent searches make that failure both
+unlikely and \emph{visible}: with \code{n_starts >= 2} the fit
+carries \code{start_logliks}, and a warning is issued when the best
+value is not replicated by at least two searches.
+\code{control = list(n_starts = 4, cores = 4)} is a good default for
+multimodal surfaces (e.g. \code{"noX"} with \eqn{N \ge 3}) at the
+wall-clock cost of a single search.}
 \item{\code{cores} (\code{1})}{Parallel workers, via the base
 \pkg{parallel} package (forked on Unix, PSOCK cluster on Windows).
 With either multi-start form, the starts are fitted in parallel —
-\code{control = list(start = st, cores = 4)} — and the result is
+\code{control = list(n_starts = 4, cores = 4)} — and the result is
 identical for any value, because each fit is deterministic given its
-start or seed; only the wall time changes. For a plain single fit,
-\code{cores > 1} instead enables \pkg{DEoptim}'s parallel evaluation
-of the population (\code{parallelType = 1}).}
+start or seed; only the wall time changes.}
 \item{\code{seed} (\code{123})}{RNG seed of the stochastic \pkg{DEoptim}
 search: \code{control = list(seed = 42)}. Unused when a warm start
 skips the global search.}
@@ -64,10 +67,9 @@ skips the global search.}
 standard errors at the optimum. Disable for speed inside loops
 (bootstraps, searches): \code{control = list(compute_se = FALSE)}.}
 \item{\code{itermax} (\code{500}), \code{NP} (\code{10 x} npar),
-\code{steptol} (\code{50}), \code{parallelType} (\code{0})}{Budget of
-the \pkg{DEoptim} global search: maximum generations, population
-size, early stop after \code{steptol} stagnant generations, and
-\pkg{DEoptim}'s own parallel mode. E.g. a quick exploratory fit:
+\code{steptol} (\code{50})}{Budget of the \pkg{DEoptim} global
+search: maximum generations, population size, early stop after
+\code{steptol} stagnant generations. E.g. a quick exploratory fit:
 \code{control = list(itermax = 100, NP = 200)}.}
 \item{\code{maxit} (\code{1000})}{Maximum iterations of the local
 L-BFGS-B refinement (\code{\link[stats]{optim}}).}
