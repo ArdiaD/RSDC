@@ -17,3 +17,6 @@
 ^inst/simulation/results/\.RData$
 ^inst/simulation/results/\.Rhistory$
 ^inst/simulation/results/\.Rapp\.history$
+^vignettes/ff10_prototype\.R$
+^vignettes/ff10_results\.rds$
+^vignettes/ff10_run\.log$

@@ -62,3 +62,4 @@ src/*.o
 src/*.so
 src/*.dll
 src/*.dylib
+data-raw/cache_*
