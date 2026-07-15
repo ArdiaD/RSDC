@@ -1,0 +1,313 @@
+---
+title: "Case study: correlation regimes in five Fama-French industries"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Case study: correlation regimes in five Fama-French industries}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 3.4, dpi = 110,
+                      message = FALSE, warning = FALSE)
+options(digits = 4)
+pre <- readRDS("ff5_app_precomputed.rds")
+library(ggplot2)
+thm <- theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(face = "bold", size = 12),
+        plot.subtitle = element_text(colour = "grey45", size = 10),
+        axis.title.x = element_blank(),
+        strip.text = element_text(face = "bold", hjust = 0))
+col_line <- "#1f5fa8"; col_shade <- "#f5cbb8"; col_label <- "#b03a2e"
+```
+
+```{r setup}
+library(RSDC)
+data("ff5ind")
+```
+
+This vignette is a complete empirical application of the package: data
+import, GARCH standardization, estimation of all model variants, model
+choice, the smoothed correlation path, a regime-based portfolio exercise,
+and bootstrap inference. The estimation and bootstrap steps take about an
+hour on 10 cores, so their code is shown but not re-run at build time; every
+displayed number comes from `data-raw/ff5_app_precompute.R`, which runs the
+code below verbatim and stores the results rendered here.
+
+## 1. Data
+
+`ff5ind` ships with the package: daily value-weighted returns (percent) of
+five Fama-French industry portfolios — Manufacturing, Energy, High Tech,
+Health, Utilities — with the Media Climate Change Concerns index (MCCC,
+monthly, forward-filled) and the CBOE VIX, aligned on 5155 U.S. trading days
+from 2005-01-03 to 2025-06-30 (see `?ff5ind` for sources and citations).
+
+```{r data-overview}
+str(ff5ind, give.attr = FALSE)
+```
+
+A 250-day rolling mean of the ten pairwise correlations already suggests
+regimes — long calm spells, crisis plateaus near 0.8, and the sample ends
+well below its 2008-2012 highs:
+
+```{r fig-rollcorr, echo = FALSE}
+ret <- as.matrix(ff5ind[, c("Manuf", "Enrgy", "HiTec", "Hlth", "Utils")])
+w <- 250L; Tn <- nrow(ret)
+roll <- rep(NA_real_, Tn)
+for (t in seq(w, Tn, by = 5L)) {
+  R <- cor(ret[(t - w + 1L):t, ])
+  roll[t] <- mean(R[lower.tri(R)])
+}
+ggplot(data.frame(date = ff5ind$DATE, roll = roll), aes(date, roll)) +
+  geom_line(colour = col_line, linewidth = 0.5, na.rm = TRUE) +
+  labs(title = "Rolling mean correlation across the five industries",
+       subtitle = "250-day window, ten pairwise correlations averaged",
+       y = "Mean pairwise correlation") +
+  thm
+```
+
+The two candidate transition covariates are close to orthogonal in this
+window — the correlation between the standardized MCCC and log-VIX is
+`r round(cor(scale(ff5ind$mccc), scale(log(ff5ind$vix))), 3)` — so they can
+carry genuinely different information about regime changes.
+
+## 2. Standardization
+
+The correlation models take mean-zero, unit-variance inputs: each return
+series is filtered by a univariate GJR-GARCH(1,1) (zero mean), and the
+standardized residuals are rescaled to exact unit variance. The fitted
+conditional volatilities `s` are kept for the portfolio step.
+
+```{r garch, eval = FALSE}
+library(rugarch)
+industries <- c("Manuf", "Enrgy", "HiTec", "Hlth", "Utils")
+ret  <- as.matrix(ff5ind[, industries])
+spec <- ugarchspec(
+  variance.model = list(model = "gjrGARCH", garchOrder = c(1, 1)),
+  mean.model     = list(armaOrder = c(0, 0), include.mean = FALSE))
+z <- s <- matrix(NA_real_, nrow(ret), ncol(ret),
+                 dimnames = list(NULL, industries))
+for (i in seq_along(industries)) {
+  g <- ugarchfit(spec, ret[, i], solver = "hybrid")
+  z[, i] <- as.numeric(residuals(g, standardize = TRUE))
+  s[, i] <- as.numeric(sigma(g))
+}
+for (i in seq_along(industries)) z[, i] <- z[, i] / sd(z[, i])
+
+X_mccc <- cbind(intercept = 1, MCCC   = as.numeric(scale(ff5ind$mccc)))
+X_vix  <- cbind(intercept = 1, logVIX = as.numeric(scale(log(ff5ind$vix))))
+X_both <- cbind(X_mccc, logVIX = X_vix[, "logVIX"])
+```
+
+## 3. Estimation
+
+All specifications are estimated with the same one-liner. Since 1.7-0 the
+global search runs in the partial-correlation parameterization (every point
+of the search box is a valid model, at any `K`); `n_starts = 4` runs four
+independent searches in parallel and keeps the best, warning if the maximum
+is not replicated — the recommended protocol for multimodal surfaces.
+
+```{r estimate, eval = FALSE}
+ctrl <- list(compute_se = FALSE, n_starts = 4, cores = 10)
+fits <- list(
+  "const"      = rsdc_estimate("const", residuals = z, N = 1, control = ctrl),
+  "noX(N=2)"   = rsdc_estimate("noX",   residuals = z, N = 2, control = ctrl),
+  "noX(N=3)"   = rsdc_estimate("noX",   residuals = z, N = 3, control = ctrl),
+  "tvtp2-MCCC" = rsdc_estimate("tvtp",  residuals = z, N = 2, X = X_mccc, control = ctrl),
+  "tvtp2-VIX"  = rsdc_estimate("tvtp",  residuals = z, N = 2, X = X_vix,  control = ctrl),
+  "tvtp2-both" = rsdc_estimate("tvtp",  residuals = z, N = 2, X = X_both, control = ctrl),
+  "tvtp3-MCCC" = rsdc_estimate("tvtp",  residuals = z, N = 3, X = X_mccc, control = ctrl),
+  "tvtp3-VIX"  = rsdc_estimate("tvtp",  residuals = z, N = 3, X = X_vix,  control = ctrl),
+  "tvtp3-both" = rsdc_estimate("tvtp",  residuals = z, N = 3, X = X_both, control = ctrl))
+```
+
+## 4. Model choice
+
+```{r comparison, echo = FALSE}
+knitr::kable(pre$comparison, digits = 1, row.names = FALSE,
+             caption = "Log-likelihood and information criteria (T = 5155).")
+```
+
+`tvtp3-both` — three regimes whose transition probabilities respond to both
+MCCC and the VIX — is retained by AIC and BIC. Because the single-covariate
+models are nested in it (a block of transition coefficients set to zero),
+likelihood-ratio tests need nothing beyond base R:
+
+```{r lrtests}
+ll <- pre$logliks; np <- pre$npars
+lr <- function(big, small) {
+  stat <- 2 * (ll[big] - ll[small]); df <- np[big] - np[small]
+  c(LR = round(stat, 1), df = df,
+    p = signif(pchisq(stat, df, lower.tail = FALSE), 2))
+}
+rbind("VIX adds to MCCC (N=3)"  = lr("tvtp3-both", "tvtp3-MCCC"),
+      "MCCC adds to VIX (N=3)"  = lr("tvtp3-both", "tvtp3-VIX"),
+      "regimes: 3 vs 2 (both)"  = lr("tvtp3-both", "tvtp2-both"))
+```
+
+Both covariates contribute massively *given the other* — consistent with
+their near-orthogonality. A useful free diagnostic: maximized
+log-likelihoods of nested models must be monotone (`const` \(\le\) `noX(N=2)`
+\(\le\) `noX(N=3)` \(\le\) `tvtp3-*` \(\le\) `tvtp3-both`); a violation would
+prove one search under-optimized. The table above satisfies every such
+inequality.
+
+## 5. Regimes and the smoothed correlation path
+
+The retained model sorts its regimes by ascending mean correlation
+(`r paste(round(pre$regime_means, 2), collapse = " / ")`): a calm, a normal
+and a crisis regime. The smoothed probabilities and the regime-weighted
+(smoothed) mean correlation path:
+
+```{r fig-regimeprobs, echo = FALSE, fig.height = 5.6}
+regime_labs <- sprintf("P(%s (rho~%.2f))", c("Calm", "Normal", "Crisis"),
+                       pre$regime_means)
+long <- data.frame(
+  date   = rep(pre$dates, times = 3L),
+  p      = as.vector(t(pre$smoothed)),
+  regime = factor(rep(regime_labs, each = length(pre$dates)),
+                  levels = regime_labs))
+ggplot(long, aes(date, p, colour = regime)) +
+  geom_line(linewidth = 0.25) +
+  facet_wrap(~ regime, ncol = 1) +
+  scale_colour_manual(values = c("#2166ac", "#e8a33d", "#d1541e"),
+                      guide = "none") +
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  labs(y = "Probability") +
+  thm
+```
+
+The smoothed regime-weighted mean correlation summarizes the ten pairs in
+one line; shaded spans are crisis-regime episodes of 20+ days on the
+Viterbi path:
+
+```{r fig-smoothcorr, echo = FALSE, fig.height = 3.8}
+d <- data.frame(date = pre$dates,
+                ma = as.numeric(stats::filter(pre$mean_corr,
+                                              rep(1 / 21, 21), sides = 2)))
+crisis <- pre$viterbi == which.max(pre$regime_means)
+r <- rle(crisis); ends <- cumsum(r$lengths); starts <- ends - r$lengths + 1L
+keep <- r$values & r$lengths >= 20L
+ep <- data.frame(start = pre$dates[starts[keep]], end = pre$dates[ends[keep]])
+ann <- data.frame(
+  date  = as.Date(c("2008-10-15", "2011-09-01", "2020-03-25")),
+  label = c("GFC", "Euro debt", "COVID"))
+ggplot(d, aes(date, ma)) +
+  geom_rect(data = ep, aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
+            inherit.aes = FALSE, fill = col_shade, alpha = 0.55) +
+  geom_line(colour = col_line, linewidth = 0.5, na.rm = TRUE) +
+  annotate("text", x = ann$date, y = max(d$ma, na.rm = TRUE) + 0.03,
+           label = ann$label, colour = col_label, size = 3.4, vjust = 0) +
+  coord_cartesian(clip = "off") +
+  labs(title = "Smoothed mean correlation across the five industries - TVTP(N=3)",
+       subtitle = "21-day moving average; shaded: crisis-regime episodes of 20+ days (Viterbi)",
+       y = "Mean pairwise correlation") +
+  thm
+```
+
+The 2007 subprime tremors, the 2008-2009 financial crisis, the 2010-2012
+euro-debt waves and the 2020 pandemic crash all appear where they should;
+the 2022 tightening cycle, by contrast, stays in the *normal* regime at
+K = 5 -- correlations rose without reaching crisis commonality. The path is
+produced by `rsdc_forecast()`:
+
+```{r forecast, eval = FALSE}
+fc <- rsdc_forecast("tvtp", N = 3, residuals = z, X = X_both,
+                    final_params = fit_both, sigma_matrix = s,
+                    value_cols = industries)
+mean_corr <- rowMeans(fc$predicted_correlations)
+```
+
+## 6. A regime-based portfolio exercise
+
+The per-period covariances \(\Sigma_t = D_t R_t D_t\) (GARCH volatilities
+around the regime-weighted correlations) feed the long-only minimum-variance
+and maximum-diversification optimizers. `lag = TRUE` makes the backtest
+look-ahead-free: weights formed at \(t-1\) earn the period-\(t\) return.
+
+```{r portfolio, eval = FALSE}
+mv <- rsdc_minvar(sigma_matrix = s, value_cols = industries,
+                  predicted_corr = fc$predicted_correlations, y = ret,
+                  long_only = TRUE, lag = TRUE)
+md <- rsdc_maxdiv(sigma_matrix = s, value_cols = industries,
+                  predicted_corr = fc$predicted_correlations, y = ret,
+                  long_only = TRUE, lag = TRUE)
+```
+
+```{r fig-portfolio, echo = FALSE, fig.height = 3.8}
+pf <- pre$pf[-1, ]
+cum <- data.frame(
+  date  = rep(pf$DATE, times = 3L),
+  value = c(cumprod(1 + pf$minvar / 100), cumprod(1 + pf$maxdiv / 100),
+            cumprod(1 + pf$equal / 100)),
+  strategy = factor(rep(c("Minimum variance", "Maximum diversification",
+                          "Equal weight"), each = nrow(pf)),
+                    levels = c("Minimum variance", "Maximum diversification",
+                               "Equal weight")))
+ggplot(cum, aes(date, value, colour = strategy)) +
+  geom_line(linewidth = 0.5) +
+  scale_y_log10() +
+  scale_colour_manual(values = c("#1f5fa8", "#e8a33d", "grey45"), name = NULL) +
+  labs(title = "Regime-based portfolios vs equal weight",
+       subtitle = "Long-only, look-ahead-free (weights formed at t-1 earn the t return)",
+       y = "Cumulative value (log scale)") +
+  thm + theme(legend.position = "bottom")
+```
+
+```{r pf-stats, echo = FALSE}
+knitr::kable(t(pre$pf_stats), digits = 2,
+             caption = "Annualized volatility and return (percent).")
+```
+
+```{r pf-weights}
+round(colMeans(pre$weights_mv), 2)   # average minimum-variance allocation
+```
+
+The regime-aware minimum-variance portfolio delivers the lowest realized
+volatility — the usual objective of correlation-regime modeling — and its
+average allocation concentrates in the defensive industries (Health and
+Utilities carry almost 80% of the book, Energy almost none), exactly what a
+long-only minimum-variance solution should look like here. No optimization
+failed: the equal-weight fallback of `rsdc_minvar()` was never triggered.
+
+## 7. Bootstrap inference
+
+Standard errors for the retained model come from a parametric bootstrap:
+simulate from the fitted model, re-estimate each replicate (warm-started, so
+no global search is repeated), and read percentile intervals.
+
+```{r bootstrap, eval = FALSE}
+bs <- rsdc_bootstrap(fit_both, B = 199, X = X_both, seed = 123, cores = 10)
+bs$ci
+```
+
+```{r boot-table, echo = FALSE}
+# Coefficient labels are b[g<row>,c<softmax column>,x<covariate>] with
+# x1 = intercept, x2 = MCCC, x3 = logVIX; keep the covariate slopes.
+ci <- pre$boot_ci
+beta_rows <- grep("x2\\]|x3\\]", rownames(ci))
+tab <- cbind(ci[beta_rows, , drop = FALSE], se = pre$boot_se[beta_rows])
+rownames(tab) <- sub("x2\\]", "MCCC]", sub("x3\\]", "logVIX]", rownames(tab)))
+star <- ifelse(tab[, 1] * tab[, 2] > 0, "*", "")
+knitr::kable(cbind(as.data.frame(round(tab, 3)), ` ` = star),
+             caption = sprintf(
+               paste("Percentile 95%% intervals for the MCCC and log-VIX",
+                     "transition slopes (B = %d); * = interval excludes 0."),
+               pre$boot_B))
+```
+
+Coefficients whose interval excludes zero drive the transitions: VIX
+coefficients push toward the high-correlation regime while MCCC coefficients
+push away from it — market fear is a commonality force, climate attention a
+dispersion force.
+
+## Reproducibility
+
+Everything above regenerates from two scripts shipped with the source
+package: `data-raw/ff5ind.R` (dataset, from the original providers) and
+`data-raw/ff5_app_precompute.R` (this vignette's estimations, portfolio and
+bootstrap). Model comparison beyond AIC/BIC deliberately stays in base R —
+`logLik()`, `pchisq()` — as shown in Section 4.
