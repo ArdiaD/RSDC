@@ -1,3 +1,36 @@
+# Changes in Version 1.7-0 (DA,BS,RN)
+- Reparameterized global search: `rsdc_estimate()`'s DEoptim stage now
+  explores canonical partial correlations (Joe, 2006, J. Multivariate
+  Analysis 97(10), 2177-2189) instead of raw pairwise correlations. Every
+  point of the search box maps to a valid positive-definite correlation
+  matrix, so the out-of-the-box global search is feasible at any K (the
+  natural box has essentially no feasible point from K ~ 5 on). For
+  `method = "noX"` with N >= 3 the transition head is searched as bounded
+  per-row softmax logits (the historical [0.01, 0.99] box on the log-odds
+  scale), which removes the row-simplex penalty wall while keeping every
+  regime reachable; the N = 2 head and all natural-parameter results are
+  unchanged. Within each search, the top three mutually distant members of
+  the final DE population are refined by L-BFGS-B and the best refined
+  point is kept (the best DE point is not always in the best basin).
+- Replication diagnostic: with `control$n_starts >= 2`, a warning is issued
+  when the best log-likelihood is reached by only one of the independent
+  searches (tolerance 2.5 log-points), signalling a possibly non-global
+  optimum. `control = list(n_starts = 4, cores = 4)` is the recommended
+  protocol for multimodal surfaces (e.g. `"noX"` with N >= 3); the default
+  remains a single search.
+- `rsdc_starts()` is unchanged and remains a fast deterministic complement:
+  when both routes agree, the optimum is cross-certified.
+- Behavior change: `cores > 1` on a plain single fit no longer enables
+  DEoptim's internal `parallelType`; parallelism lives across the
+  independent searches of the multi-start forms.
+- New dataset `ff5ind`: daily value-weighted returns of five Fama-French
+  industry portfolios (Manuf, Enrgy, HiTec, Hlth, Utils; Fama & French,
+  1997, J. Financial Economics 43(2), 153-193; data (c) Fama and French,
+  Kenneth R. French Data Library) with the MCCC Aggregate index (2025
+  Sentometrics release, monthly, forward-filled across trading days) and
+  the CBOE VIX (via FRED, VIXCLS), aligned on 5155 U.S. trading days,
+  2005-01-03 to 2025-06-30. Reproducible build in `data-raw/ff5ind.R`.
+
 # Changes in Version 1.6-0 (DA,BS,RN)
 - New `rsdc_starts()`: data-driven warm starts for high-dimensional problems.
   In moderate dimensions the DEoptim global search works well, but for K >= 5
