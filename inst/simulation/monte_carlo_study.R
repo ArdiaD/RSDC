@@ -23,8 +23,10 @@
 #     X[t] timing and the same t=1 prior, so simulator and likelihood tell
 #     the same story; nothing in the DGPs needed to change.
 #   * compute_se = FALSE (SEs play no role in bias/RMSE; estimates identical).
-#   * Estimation uses package DEFAULTS otherwise (single search): the study
-#     validates the out-of-the-box estimator, as the previous one did.
+#   * Two estimation arms: "default" (single search, out-of-the-box, as the
+#     previous study) for all cells, plus "ns4" (control$n_starts = 4, the
+#     documented protocol for multimodal surfaces) for the N = 3 cases 4-5.
+#     Same data in both arms: the delta isolates the multi-start's value.
 #
 # Parallelization: ALL (case, K, T, m) replications are flattened into one
 # global task queue mapped over the workers by a single parallel::mclapply
@@ -69,6 +71,11 @@ MC_CORES <- {
   if (!is.na(env) && env >= 1L) env else 14L
 }
 CTRL <- list(compute_se = FALSE)     # SEs play no role in bias/RMSE
+# Second arm for the multimodal N = 3 cases (4 and 5): the documented
+# protocol for multimodal surfaces (n_starts = 4 independent searches, best
+# kept). Same seeds -> same simulated data; only the estimation protocol
+# differs, so "default vs protocol" isolates the value of the multi-start.
+CTRL_NS4 <- list(compute_se = FALSE, n_starts = 4L)
 
 # Pin BLAS to one thread under the M-way fork (no-op if RhpcBLASctl absent).
 if (requireNamespace("RhpcBLASctl", quietly = TRUE)) RhpcBLASctl::blas_set_num_threads(1L)
@@ -198,23 +205,23 @@ FAIL <- list(
                      rho1_hat = NA_real_, rho2_hat = NA_real_, rho3_hat = NA_real_)
 )
 
-run_case1 <- function(m, TT, KK) {
+run_case1 <- function(m, TT, KK, ctrl = CTRL) {
   set.seed(20000L + TT * 1000L + m)
   Sigma <- array(make_corr(C1_K, C1_RHO), dim = c(C1_K, C1_K, 1L))
   sim <- rsdc_simulate(n = TT, X = matrix(1, TT, 1L),
                        beta = matrix(nrow = 1L, ncol = 0L),
                        mu = matrix(0, 1L, C1_K), sigma = Sigma, N = 1L)
-  fit <- rsdc_estimate("const", residuals = sim$observations, control = CTRL)
+  fit <- rsdc_estimate("const", residuals = sim$observations, control = ctrl)
   data.frame(converged = TRUE, rho_hat = fit$correlations[1L, 1L])
 }
 
-run_case2 <- function(m, TT, KK) {
+run_case2 <- function(m, TT, KK, ctrl = CTRL) {
   set.seed(10000L + TT * 1000L + m)
   Sigma <- array(0, dim = c(C2_K, C2_K, C2_N))
   Sigma[,, 1L] <- make_corr(C2_K, C2_RHO1); Sigma[,, 2L] <- make_corr(C2_K, C2_RHO2)
   sim <- rsdc_simulate(n = TT, X = matrix(1, TT, 1L), beta = C2_BETA,
                        mu = matrix(0, C2_N, C2_K), sigma = Sigma, N = C2_N)
-  fit <- rsdc_estimate("noX", residuals = sim$observations, N = C2_N, control = CTRL)
+  fit <- rsdc_estimate("noX", residuals = sim$observations, N = C2_N, control = ctrl)
   data.frame(converged = TRUE,
              p11_hat = fit$transition_matrix[1L, 1L],
              p22_hat = fit$transition_matrix[2L, 2L],
@@ -222,7 +229,7 @@ run_case2 <- function(m, TT, KK) {
              rho2_hat = fit$correlations[2L, 1L])
 }
 
-run_case3 <- function(m, TT, KK) {
+run_case3 <- function(m, TT, KK, ctrl = CTRL) {
   set.seed(31000L + TT * 1000L + m)
   X <- ar1_X(TT, C3_PHI)
   Sigma <- array(0, dim = c(C3_K, C3_K, C3_N))
@@ -230,7 +237,7 @@ run_case3 <- function(m, TT, KK) {
   sim <- rsdc_simulate(n = TT, X = X, beta = C3_BETA,
                        mu = matrix(0, C3_N, C3_K), sigma = Sigma, N = C3_N)
   fit <- rsdc_estimate("tvtp", residuals = sim$observations, N = C3_N, X = X,
-                       control = CTRL)
+                       control = ctrl)
   r1 <- fit$correlations[1L, 1L]; r2 <- fit$correlations[2L, 1L]
   data.frame(converged = TRUE, label_ok = r2 > r1,
              bound_hit = any(abs(fit$beta) >= 9.5),
@@ -241,14 +248,14 @@ run_case3 <- function(m, TT, KK) {
              rho1_hat = r1, rho2_hat = r2)
 }
 
-run_case4 <- function(m, TT, KK) {
+run_case4 <- function(m, TT, KK, ctrl = CTRL) {
   set.seed(40000000L + KK * 3000000L + TT * 1000L + m)
   Sigma <- array(0, dim = c(KK, KK, C4_N))
   for (i in seq_len(C4_N))
     Sigma[,, i] <- make_corr(KK, rep(C4_RHO[i], KK * (KK - 1L) / 2L))
   sim <- rsdc_simulate(n = TT, X = matrix(1, TT, 1L), beta = C4_BETA,
                        mu = matrix(0, C4_N, KK), sigma = Sigma, N = C4_N)
-  fit <- rsdc_estimate("noX", residuals = sim$observations, N = C4_N, control = CTRL)
+  fit <- rsdc_estimate("noX", residuals = sim$observations, N = C4_N, control = ctrl)
   data.frame(converged = TRUE,
              p11_hat = fit$transition_matrix[1L, 1L],
              p22_hat = fit$transition_matrix[2L, 2L],
@@ -258,7 +265,7 @@ run_case4 <- function(m, TT, KK) {
              rho3_hat = mean(fit$correlations[3L, ]))
 }
 
-run_case5 <- function(m, TT, KK) {
+run_case5 <- function(m, TT, KK, ctrl = CTRL) {
   set.seed(70000000L + KK * 3000000L + TT * 1000L + m)
   X <- ar1_X(TT, C5_PHI)
   Sigma <- array(0, dim = c(KK, KK, C5_N))
@@ -267,7 +274,7 @@ run_case5 <- function(m, TT, KK) {
   sim <- rsdc_simulate(n = TT, X = X, beta = C5_BETA,
                        mu = matrix(0, C5_N, KK), sigma = Sigma, N = C5_N)
   fit <- rsdc_estimate("tvtp", residuals = sim$observations, N = C5_N, X = X,
-                       control = CTRL)
+                       control = ctrl)
   r <- rowMeans(fit$correlations)
   data.frame(converged = TRUE, label_ok = (r[1] < r[2]) & (r[2] < r[3]),
              bound_hit = any(abs(fit$beta) >= 9.5),
@@ -296,8 +303,14 @@ cells <- rbind(
   expand.grid(case = "case3", K = C3_K, T = T_grid,  stringsAsFactors = FALSE),
   expand.grid(case = "case4", K = K4_grid, T = T_grid, stringsAsFactors = FALSE),
   expand.grid(case = "case5", K = C5_K, T = T5_grid, stringsAsFactors = FALSE))
+cells$arm <- "default"
+# Protocol arm (n_starts = 4) for the multimodal N = 3 cases only.
+ns4 <- cells[cells$case %in% c("case4", "case5"), ]
+ns4$arm <- "ns4"
+cells <- rbind(cells, ns4)
 tasks <- merge(cells, data.frame(m = seq_len(M)))
-weight <- with(tasks, ifelse(case %in% c("case4", "case5"), 10, 1) * K * T)
+weight <- with(tasks, ifelse(case %in% c("case4", "case5"), 10, 1) * K * T *
+                      ifelse(arm == "ns4", 4, 1))
 tasks  <- tasks[order(-weight), ]
 
 cat(sprintf("Monte Carlo: RSDC %s | %d cells x M=%d -> %d tasks | cores=%d%s\n",
@@ -307,7 +320,8 @@ cat(sprintf("Monte Carlo: RSDC %s | %d cells x M=%d -> %d tasks | cores=%d%s\n",
 t0_all <- proc.time()["elapsed"]
 raw <- parallel::mclapply(seq_len(nrow(tasks)), function(i) {
   tk <- tasks[i, ]
-  out <- tryCatch(WORKERS[[tk$case]](tk$m, tk$T, tk$K),
+  out <- tryCatch(WORKERS[[tk$case]](tk$m, tk$T, tk$K,
+                                     ctrl = if (tk$arm == "ns4") CTRL_NS4 else CTRL),
                   error = function(e) FAIL[[tk$case]])
   cbind(tk, out, row.names = NULL)
 }, mc.cores = MC_CORES, mc.preschedule = FALSE)
@@ -348,11 +362,13 @@ all_by_case <- lapply(split(raw, case_of), function(l) do.call(rbind, l))
 results <- list()
 
 for (ci in seq_len(nrow(cells))) {
-  cs <- cells$case[ci]; KK <- cells$K[ci]; TT <- cells$T[ci]
+  cs <- cells$case[ci]; KK <- cells$K[ci]; TT <- cells$T[ci]; arm <- cells$arm[ci]
   res <- all_by_case[[cs]]
-  res <- res[res$K == KK & res$T == TT, , drop = FALSE]
-  cell_id  <- sprintf("%s_K%d_T%d", cs, KK, TT)
-  cell_lab <- sprintf("K=%d,T=%d", KK, TT)
+  res <- res[res$K == KK & res$T == TT & res$arm == arm, , drop = FALSE]
+  cell_id  <- sprintf("%s_K%d_T%d%s", cs, KK, TT,
+                      if (arm == "ns4") "_ns4" else "")
+  cell_lab <- sprintf("K=%d,T=%d%s", KK, TT,
+                      if (arm == "ns4") ",ns=4" else "")
   ok <- res$converged
   usable <- if ("label_ok" %in% names(res) && any(!is.na(res$label_ok))) {
     ok & res$label_ok & !(ok & res$bound_hit)
@@ -367,7 +383,7 @@ for (ci in seq_len(nrow(cells))) {
     colnames(est_mat) <- names(true_vals)
     smry <- make_summary(est_mat, true_vals)
     print_summary(smry)
-    smry$K <- KK; smry$T <- TT; smry$usable <- sum(usable)
+    smry$K <- KK; smry$T <- TT; smry$arm <- arm; smry$usable <- sum(usable)
     save_csv(smry, sprintf("%s_summary.csv", cell_id))
     draw_and_save(function() boxplot_grid(est_mat, true_vals, cell_lab,
                                           TRUES$mfrow[[cs]], TRUES$col[[cs]]),
@@ -375,7 +391,7 @@ for (ci in seq_len(nrow(cells))) {
                   width  = 400 * TRUES$mfrow[[cs]][2] + 200,
                   height = 400 * TRUES$mfrow[[cs]][1] + 100)
   }
-  results[[cell_id]] <- list(case = cs, K = KK, T = TT, M = M,
+  results[[cell_id]] <- list(case = cs, K = KK, T = TT, arm = arm, M = M,
                              n_converged = sum(ok), n_usable = sum(usable),
                              reps = res)
 }
