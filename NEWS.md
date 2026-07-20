@@ -1,4 +1,9 @@
 # Changes in Version 1.7-0 (DA,BS,RN)
+- New main vignette `RSDC.Rmd`: the package article, fully executable, with
+  a strictly out-of-sample five-industry study (train-window GARCH filtering
+  and covariate scaling, held-out evaluation and portfolios) and a
+  `Validation` section summarizing the shipped Monte Carlo study. Replaces
+  the `ff5-application` vignette.
 - Reparameterized global search: `rsdc_estimate()`'s DEoptim stage now
   explores canonical partial correlations (Joe, 2006, J. Multivariate
   Analysis 97(10), 2177-2189) instead of raw pairwise correlations. Every

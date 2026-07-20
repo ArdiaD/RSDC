@@ -63,3 +63,10 @@ src/*.so
 src/*.dll
 src/*.dylib
 data-raw/cache_*
+vignettes/RSDC_cache/
+vignettes/RSDC_files/
+vignettes/*.html
+vignettes/RSDC.tex
+vignettes/RSDC.log
+vignettes/RSDC.R
+vignettes/RJwrapper.log

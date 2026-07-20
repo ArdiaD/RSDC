@@ -17,3 +17,10 @@
 ^inst/simulation/results/\.RData$
 ^inst/simulation/results/\.Rhistory$
 ^inst/simulation/results/\.Rapp\.history$
+^vignettes/RSDC_cache$
+^vignettes/RSDC_files$
+^vignettes/.*\.html$
+^vignettes/RSDC\.tex$
+^vignettes/RSDC\.log$
+^vignettes/RSDC\.R$
+^vignettes/RJwrapper\.log$
