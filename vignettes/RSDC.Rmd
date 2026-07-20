@@ -1,0 +1,972 @@
+---
+title: "RSDC: Regime-Switching Correlation Models in R"
+date: "`r Sys.Date()`"
+abstract: >
+  The \CRANpkg{RSDC} package implements regime-switching correlation models
+  in R, extending the @pelletier2006 framework with time-varying transition
+  probabilities (TVTP) driven by exogenous covariates and with an arbitrary
+  number of regimes through a multinomial-logit (softmax) parameterization.
+  Estimation combines a global search in a reparameterized space in which
+  every candidate is a valid correlation matrix with local refinement and a
+  multi-start replication diagnostic, making the maximum-likelihood
+  estimator usable in higher cross-sectional dimensions. We present the
+  methodology, the package design, a Monte Carlo validation, and a strictly
+  out-of-sample study of five Fama-French industry portfolios in which
+  transitions respond to two nearly orthogonal covariates, the Media Climate
+  Change Concerns index and the VIX, and feed regime-based minimum-variance
+  and maximum-diversification allocations. All results are reproducible from
+  data shipped with the package.
+draft: false
+author:
+  - name: David Ardia
+    affiliation: CIRANO, GERAD, HEC Montréal
+    address:
+      - Department of Decision Science
+      - Montréal, Canada
+    email: david.ardia@hec.ca
+    orcid: 0000-0003-2823-782X
+  - name: Benjamin Seguin
+    affiliation: HEC Montréal
+    address:
+      - Department of Decision Science
+      - Montréal, Canada
+  - name: Roosevelt Ymele Nguemo
+    affiliation: HEC Montréal
+    address:
+      - Department of Decision Science
+      - Montréal, Canada
+    orcid: 0009-0003-9399-6256
+type: package
+output:
+  rjtools::rjournal_article:
+    self_contained: yes
+    toc: no
+    citation_package: natbib
+    keep_tex: true
+bibliography: RSDC.bib
+editor_options:
+  markdown:
+    wrap: 72
+header-includes:
+  - |
+    \usepackage{graphicx}
+    \usepackage{float}
+    \floatplacement{table}{H}
+    \floatplacement{figure}{H}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  fig.align = "center", fig.pos = "H", fig.width = 7, fig.height = 3.6, dpi = 110,
+  message = FALSE, warning = FALSE, cache = TRUE, cache.lazy = FALSE)
+options(digits = 4)
+# rjtools' post-knit package check queries the CRAN task views over a
+# hardcoded http URL; force the working https mirror so the render does not
+# stall on networks that block plain http.
+if (requireNamespace("rjtools", quietly = TRUE)) {
+  try(assignInNamespace(
+    ".cran",
+    function(path = "") paste0("https://cran.r-project.org", path),
+    ns = "rjtools"), silent = TRUE)
+}
+# Namespaces loaded here (uncached) so cached chunks keep their S3 methods
+library(RSDC)
+library(rugarch)
+library(ggplot2)
+thm <- theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(face = "bold", size = 12),
+        plot.subtitle = element_text(colour = "grey45", size = 10),
+        axis.title.x = element_blank(),
+        strip.text = element_text(face = "bold", hjust = 0))
+```
+
+# Introduction
+
+Modeling time-varying correlations between asset returns is central to
+portfolio construction and risk management. Smooth-transition approaches
+such as the DCC model of @engle2002 let correlations evolve continuously.
+An alternative view is that correlations spend long spells near
+regime-specific levels and move abruptly when the market changes state.
+Regime-switching dynamic correlation (RSDC) models [@pelletier2006]
+formalize this view: the covariance matrix is decomposed into univariate
+volatilities and a correlation matrix $R_{S_t}$ driven by a latent Markov
+state $S_t$, so the correlation matrix is constant within a regime and
+shifts discretely between regimes.
+
+The \CRANpkg{RSDC} package implements this model class and extends it
+in two directions. First, transition probabilities may be *time-varying*
+(TVTP): they respond to any observable indicator supplied by the user, a
+volatility index, a sentiment or news-attention series, a macroeconomic
+factor, following the state-dependent Markov-switching tradition of
+@filardo1994, @diebold1994 and @gray1996. Second, all specifications
+support an arbitrary number of regimes $N$, with a logistic link for
+$N = 2$ and a multinomial-logit (softmax) link for $N \ge 3$. In the
+empirical illustration the covariates are the Media Climate Change Concerns
+index [@ardia2023] and the VIX, but nothing in the package is specific to
+climate applications.
+
+Three model variants are provided: a constant-correlation baseline
+(`"const"`), the fixed-transition Markov-switching model of @pelletier2006
+(`"noX"`), and the covariate-driven TVTP model (`"tvtp"`). Estimation is by
+maximum likelihood through the Hamilton filter [@hamilton1989]. A
+practical obstacle in this model class is that the likelihood must be
+maximized over correlation matrices: a box of pairwise correlations almost
+never contains a positive-definite point once $K$ grows, which starves any
+box-constrained global optimizer. Since version 1.7-0 the package removes
+this obstacle by searching in the canonical partial-correlation
+parameterization of @joe2006generating, in which *every* point of the
+search box is a valid correlation matrix; the full estimation strategy is described in
+the Methodology section.
+
+Several CRAN packages address neighbouring problems;
+Table \@ref(tab:related) summarizes the comparison. \CRANpkg{rmgarch}
+[@ghalanos2024rmgarch] implements the DCC family, in which correlations
+evolve smoothly and transitions cannot be tied to covariates.
+\CRANpkg{MSGARCH} [@ardia2019] provides Markov-switching GARCH for
+univariate volatility. General hidden-Markov toolkits such as
+\CRANpkg{depmixS4} [@visser2010] and \CRANpkg{MSwM} can represent
+switching in generic parameters but offer neither correlation-matrix
+regimes with guaranteed positive definiteness nor portfolio tooling.
+\CRANpkg{RSDC} fills this gap: regime-switching of the correlation
+matrix itself, covariate-driven transitions, and a direct pipeline from
+correlation forecasts to minimum-variance and maximum-diversification
+portfolios.
+
+\small
+
+```{r related, echo = FALSE, cache = FALSE}
+rel <- data.frame(
+  Package = c("RSDC", "rmgarch", "MSGARCH", "depmixS4", "MSwM"),
+  `Model class` = c("RS correlation",
+                    "DCC (smooth)",
+                    "MS-GARCH",
+                    "hidden Markov",
+                    "MS regression"),
+  `Corr. regimes` = c("yes", "no", "no", "generic", "no"),
+  `Covar. transitions` = c("yes", "no", "no", "no", "no"),
+  `Portfolio tools` = c("yes", "no", "no", "no", "no"),
+  check.names = FALSE)
+knitr::kable(rel, caption = "Related CRAN packages. `depmixS4` can represent
+  switching in generic distribution parameters but has no notion of a
+  positive-definite correlation-matrix regime.")
+```
+
+\normalsize
+
+Throughout, the input data are *standardized residuals*: returns filtered
+by univariate volatility models (e.g., GARCH) and scaled to unit variance,
+so that the regime dynamics identified by the package pertain to
+correlations only. The remainder of the paper presents, in turn, the methodology, the
+package design, a simulation-based validation, and the empirical
+illustration.
+
+# Methodology {#sec:methodology}
+
+## Regime-switching correlation model
+
+Let $U_t$ denote the $K$-dimensional vector of standardized residuals at
+time $t$ and $S_t \in \{1, \dots, N\}$ a latent regime indicator.
+Conditional on the regime, $U_t$ is multivariate normal with a
+regime-specific correlation matrix:
+
+$$
+U_t \mid (S_t = j) \sim \mathcal{N}(0, R_j),
+$$
+
+where each $R_j$ is a $K \times K$ correlation matrix with $K(K-1)/2$ free
+parameters $\rho^{(j)}$. With $N = 1$ the model reduces to the
+constant-correlation baseline (`"const"`). For identifiability, the
+estimators order regimes by ascending mean correlation, so regime 1 is
+always the lowest-correlation state; this labeling convention is used in
+all outputs.
+
+## Markov switching dynamics
+
+The regime follows a first-order Markov chain. We write $P$ for a constant
+transition matrix and $\pi_{ij}(t)$ for the operative transition
+probability at time $t$: the constant entry $P_{ij}$ in the
+fixed-transition model, or the covariate-dependent value defined below in
+the TVTP model.
+
+### Fixed transitions (`"noX"`)
+
+The transition matrix $P$, with
+$P_{ij} = \Pr(S_t = j \mid S_{t-1} = i)$, is constant. For $N = 2$,
+
+$$
+P =
+\begin{pmatrix}
+p_{11} & 1 - p_{11} \\
+1 - p_{22} & p_{22}
+\end{pmatrix},
+$$
+
+with $p_{11}, p_{22}$ the regime persistences. For $N \ge 3$, row $i$ is
+parameterized by its first $N - 1$ probabilities, the last entry following
+by complement; each free probability is bounded in $[0.01, 0.99]$.
+
+### Time-varying transitions (`"tvtp"`)
+
+With covariates $x_t \in \mathbb{R}^{p}$ (including an intercept column if
+desired, the package does not add one automatically), the transition
+matrix varies over time. For $N = 2$ the *stay* probabilities follow a
+logistic link,
+
+$$
+\pi_{ii}(t) = \frac{\exp(x_t^\top \beta_{i})}{1 + \exp(x_t^\top \beta_{i})},
+\qquad i = 1, 2,
+$$
+
+with the switching probability obtained by complement,
+$\pi_{ij}(t) = 1 - \pi_{ii}(t)$ for $j \neq i$. Here $\beta_i$ is a
+length-$p$ coefficient vector; when $x_t$ contains an intercept and a
+single indicator, a large positive slope in $\beta_1$ means that regime 1
+becomes more persistent when the indicator is high.
+
+For $N \ge 3$ a multinomial-logit (softmax) link is used: for each current
+state $i$,
+
+$$
+\pi_{ij}(t) =
+\frac{\exp(x_t^\top \beta_{ij})}{\sum_{k=1}^{N} \exp(x_t^\top \beta_{ik})},
+\qquad j = 1, \dots, N,
+$$
+
+with the $N$-th logit fixed at zero as the reference category, leaving
+$N - 1$ free coefficient vectors $\beta_{ij}$ per row. The $N = 2$ logistic
+link is this softmax specialized to two states with state $i$ itself as the
+modeled category, so the two displays use one convention. The coefficient
+index carries the difference: one vector $\beta_i$ per row when $N = 2$,
+$N - 1$ vectors $\beta_{ij}$ per row when $N \ge 3$.
+
+### Model variants and parameter count
+
+The three variants differ only in their transition block. The
+constant-correlation model (`method = "const"`) is the $N = 1$ special
+case: a single matrix $R_1$ estimated over the whole sample, whose
+log-likelihood admits a closed form; it is the natural baseline. The
+fixed-transition model (`method = "noX"`), following @pelletier2006,
+captures regime shifts without exogenous covariates. The TVTP model
+(`method = "tvtp"`) lets regime durations depend explicitly on observed
+covariates such as financial-stress indicators, volatility indices, or
+news-attention series.
+
+The number of estimated parameters is:
+
+* **TVTP:** transition coefficients, $N \times p$ for $N = 2$ (logistic) or
+  $N(N-1) \times p$ for $N \ge 3$ (softmax), plus $N$ correlation matrices,
+  i.e. $N\,K(K-1)/2$ correlations in total;
+* **Fixed transitions (`noX`):** the $N(N-1)$ free entries of $P$ plus the
+  $N\,K(K-1)/2$ correlations;
+* **Constant correlation (`const`):** a single correlation matrix,
+  $K(K-1)/2$ parameters;
+
+where $p$ is the number of columns of $x_t$, including the intercept if one
+is supplied. Means and variances are not estimated: inputs are assumed
+standardized, and the fitted objects report placeholder regime means (0)
+and volatilities (1) that do not enter the likelihood. Model selection can
+be guided by information criteria such as the AIC and BIC.
+
+## Likelihood inference via the Hamilton filter
+
+Parameters are estimated by maximum likelihood, with the likelihood
+evaluated by the Hamilton filter [@hamilton1989]. The filter proceeds as
+follows.
+
+**Prediction step.** Given the filtered probability from the previous time
+step, $\xi_{i,t-1} = \Pr(S_{t-1} = i \mid \Omega_{t-1})$, where
+$\Omega_{t-1}$ is the information available up to time $t-1$, the
+predictive probability of being in state $j$ at time $t$ is
+
+$$
+\Pr(S_t = j \mid \Omega_{t-1}) = \sum_{i=1}^{N} \xi_{i,t-1}\,\pi_{ij}(t),
+$$
+
+with $\pi_{ij}(t)$ the operative transition probability defined above.
+
+**Update step.** We observe $U_t$ and compute its likelihood under each
+regime,
+
+$$
+f(U_t \mid S_t = j) = (2\pi)^{-K/2}\, |R_j|^{-1/2}
+\exp\!\left\{ -\tfrac{1}{2}\, U_t^\top R_j^{-1} U_t \right\},
+$$
+
+and Bayes' rule updates the filtered probabilities:
+
+$$
+\xi_{j,t} = \Pr(S_t = j \mid \Omega_t) =
+\frac{\Pr(S_t = j \mid \Omega_{t-1})\, f(U_t \mid S_t = j)}
+     {\sum_{m=1}^{N} \Pr(S_t = m \mid \Omega_{t-1})\, f(U_t \mid S_t = m)}.
+$$
+
+**Likelihood.** The log-likelihood accumulates the prediction-error
+decomposition,
+
+$$
+\sum_{t=1}^{T} \log f(U_t \mid \Omega_{t-1}), \qquad
+f(U_t \mid \Omega_{t-1}) =
+\sum_{j=1}^{N} \Pr(S_t = j \mid \Omega_{t-1})\, f(U_t \mid S_t = j).
+$$
+
+**Initialization and smoothing.** At $t = 1$ the filter uses a uniform
+prior $\xi_{i,0} = 1/N$; an optional warm-start state (`xi_init`) is used
+internally by the two-pass out-of-sample forecast. After filtering, a
+backward recursion delivers the smoothed probabilities
+$\Pr(S_t = j \mid \Omega_T)$. The filter's inner loop is implemented in
+C++ (via \CRANpkg{RcppArmadillo}), with the pure-R implementation retained
+as a tested reference.
+
+## A feasible-by-construction global search {#sec:estimation}
+
+The likelihood surface of a switching model is multimodal, and its natural
+parameter space is hostile to global search: a correlation matrix must be
+positive definite, which is a *joint* constraint on the $K(K-1)/2$
+pairwise correlations that no per-coordinate box can express. The
+probability that a uniform draw from the box is a valid matrix collapses
+with $K$, near zero already for $K \ge 7$, so a naive global
+optimizer starts from an almost entirely infeasible population. Since
+version 1.7-0 the package therefore searches in a reparameterized space in
+which feasibility holds *by construction*, with three ingredients.
+
+**Partial correlations.** The global stage explores the canonical partial
+correlations of a C-vine [@joe2006generating]: a vector
+$z \in (-1, 1)^{K(K-1)/2}$ whose map to correlation matrices is a
+*bijection* with the set of positive-definite correlation matrices, every point of the box is a valid model at any $K$. The first $K - 1$
+coordinates are plain correlations with the first variable, deeper
+coordinates are partial correlations, so the parameterization remains
+interpretable; it is the same transform used by Stan for its correlation
+matrix type.
+
+**Bounded-softmax transition head.** For `"noX"` with $N \ge 3$ the free
+transition probabilities of each row face a second joint constraint (a row
+must sum to at most one). The global stage searches per-row softmax logits
+bounded at $\pm 4$ instead: every point of the box now yields a valid row,
+and the bound, the historical $[0.01, 0.99]$ probability box mapped to
+the log-odds scale, keeps every transition probability away from zero,
+so no regime can degenerate into an unreachable state during the search.
+The $N = 2$ head, which faces no joint constraint, is unchanged.
+
+**Search, refinement, and replication.** Each search runs differential
+evolution [@mullen2011; @ardia2011] in the reparameterized space, refines
+the best mutually distant candidates of the final population by L-BFGS-B in
+the natural space, and returns the best refined point. Because a single
+stochastic search can still land in a suboptimal basin of a multimodal
+surface, `control = list(n_starts = k)` runs $k$ independent searches from
+derived seeds and keeps the best fit; the per-start log-likelihoods are
+stored on the fit, and a warning is issued when the maximum is not
+replicated by at least two searches. Data-driven warm starts
+(`rsdc_starts()`) remain available as a deterministic complement: when both
+routes agree, the optimum is cross-certified. All searches are
+reproducible: the seed is exposed via `control$seed` (default 123) and
+results are invariant to the number of cores.
+
+Model selection across fitted specifications proceeds by information
+criteria; because the three variants are nested (set covariate slopes to
+zero to obtain `"noX"`; collapse regimes to obtain `"const"`),
+likelihood-ratio tests are available with base R alone, as the empirical
+illustration shows. A free by-product of nesting is a
+consistency check: a nested model can never attain a higher maximized
+likelihood than the model that contains it, so any violation reveals an
+under-optimized fit.
+
+# Package design and usage {#sec:design}
+
+The user-facing API is small. Table \@ref(tab:api) lists the exported
+functions; everything else (S3 methods, tidiers) follows R conventions.
+
+\small
+
+```{r api, echo = FALSE, cache = FALSE}
+api <- data.frame(
+  Function = c("rsdc_estimate()", "rsdc_starts()", "rsdc_likelihood()",
+               "rsdc_hamilton()", "rsdc_forecast()", "rsdc_forecast_ahead()",
+               "rsdc_corr_bands()", "rsdc_viterbi()", "rsdc_bootstrap()",
+               "rsdc_simulate()", "rsdc_minvar(), rsdc_maxdiv()"),
+  Purpose = c("fit const, noX or tvtp by maximum likelihood",
+              "data-driven warm starts (multi-start)",
+              "likelihood evaluation",
+              "Hamilton filter and smoother",
+              "correlation and covariance paths",
+              "multi-step-ahead forecasts",
+              "uncertainty bands on the correlation path",
+              "most likely (MAP) regime path",
+              "parametric bootstrap (SEs, CIs)",
+              "simulate from a fitted or specified model",
+              "long-only MV and MD portfolio weights"))
+knitr::kable(api, caption = "Exported functions of RSDC.")
+```
+
+\normalsize
+
+`rsdc_estimate()` takes `method`, `residuals`, `N`, `X`, `out_of_sample`
+and a `control` list, and returns an `"rsdc_fit"` object storing, among others, `correlations` (the $N \times
+K(K-1)/2$ regime correlations), `transition_matrix` (for `"tvtp"`,
+evaluated at the in-sample covariate means, a point summary, not the
+path), `beta`, `log_likelihood` (and `log_likelihood_oos` when
+`out_of_sample = TRUE`), and filtered/smoothed probabilities. Standard
+generics apply: `print`, `summary`, `coef`, `logLik`, `AIC`, `BIC`,
+`nobs`, `vcov`, `confint`, `predict`, `simulate`, `plot`, plus
+`broom`-style `tidy()`/`glance()`/`augment()` and a `ggplot2::autoplot()`
+method. The `control` list exposes the estimation protocol: `seed`
+(default 123), `n_starts`, `cores`, `itermax`/`NP`/`steptol` (global-stage
+budget), `maxit` (refinement), `compute_se`, and `start` (a warm start,
+which skips the global search).
+
+As a compact walkthrough, and a first look at the data machinery used in
+the empirical illustration, we fit the two-regime TVTP model to the
+green/brown portfolio pair shipped with the package [@ardia2023], with the
+Media Climate Change Concerns (MCCC) index as the transition covariate.
+Returns are first filtered by univariate GJR-GARCH(1,1) models
+(\CRANpkg{rugarch}); to keep the walkthrough strictly out-of-sample we
+estimate every model on the first 70% of the sample
+(`out_of_sample = TRUE`) and reserve the remainder for evaluation, scaling
+the covariate by its training-window moments.
+
+```{r gb-data}
+library(RSDC)
+library(rugarch)
+
+data("greenbrown"); data("mccc")
+stopifnot(identical(greenbrown$DATE, mccc$DATE))
+gb_ret <- as.matrix(greenbrown[, c("return_green", "return_brown")]) * 100
+n_gb   <- nrow(gb_ret)
+cut_gb <- round(0.7 * n_gb)                    # the package's 70/30 split
+
+# GJR-GARCH(1,1), zero mean, fitted on the training window only; the fitted
+# parameters then filter the full series (no test-window information enters).
+garch_filter <- function(ret, cut) {
+  spec <- ugarchspec(
+    variance.model = list(model = "gjrGARCH", garchOrder = c(1, 1)),
+    mean.model     = list(armaOrder = c(0, 0), include.mean = FALSE))
+  K <- ncol(ret)
+  z <- s <- matrix(NA_real_, nrow(ret), K,
+                   dimnames = list(NULL, colnames(ret)))
+  for (i in seq_len(K)) {
+    fit <- ugarchfit(spec, ret[, i], solver = "hybrid",
+                     out.sample = nrow(ret) - cut)
+    spec_i <- spec; setfixed(spec_i) <- as.list(coef(fit))
+    filt <- ugarchfilter(spec_i, ret[, i])
+    z[, i] <- as.numeric(residuals(filt)) / as.numeric(sigma(filt))
+    s[, i] <- as.numeric(sigma(filt))
+  }
+  for (i in seq_len(K))                       # train-window scale
+    z[, i] <- z[, i] / sd(z[seq_len(cut), i])
+  list(z = z, s = s)
+}
+gb <- garch_filter(gb_ret, cut_gb)
+mccc_tr  <- mccc$mccc
+mccc_std <- (mccc_tr - mean(mccc_tr[1:cut_gb])) /
+  sd(mccc_tr[1:cut_gb])
+X_gb <- cbind(intercept = 1, MCCC = mccc_std)
+```
+
+```{r gb-fit}
+fit_gb <- rsdc_estimate("tvtp", residuals = gb$z, N = 2, X = X_gb,
+                        out_of_sample = TRUE,
+                        control = list(n_starts = 4, cores = 4))
+fit_gb
+```
+
+The printed fit reports the regime correlations (ordered low to high), the
+transition summary, and both the training log-likelihood and the out-of-sample
+predictive log-likelihood. `summary(fit_gb)` adds standard errors from the
+observed information, delta-method standard errors for the implied
+transition probabilities, and regime diagnostics (expected durations,
+ergodic distribution); `confint()` provides Wald intervals. Regimes beyond
+three are supported for `"noX"` and `"tvtp"` (`N = 4` and higher), with the
+same softmax head.
+
+# Validation {#sec:validation}
+
+Two kinds of evidence support the implementation. First, an analytic
+anchor: with `method = "const"` the maximum-likelihood correlation matrix
+is the sample correlation of the standardized residuals, and the package
+reproduces it to numerical precision (this identity is part of the test
+suite). Second, a full Monte Carlo study ships with the package: the
+script `inst/simulation/monte_carlo_study.R` regenerates it end to end,
+and its report `montecarlo_validation.pdf` is installed alongside and
+available online at
+\url{https://github.com/ArdiaD/RSDC/blob/master/inst/simulation/montecarlo_validation.pdf}.
+The study covers five specifications, constant,
+`noX` and `tvtp` at $N \in \{2, 3\}$, simulated and re-estimated with
+$M = 100$ replications per cell, $T \in \{500, 1000, 2000\}$ and, for the
+three-regime fixed-transition case, $K \in \{2, 3, 5\}$.
+
+Three findings matter for users. Bias and RMSE shrink with $T$ in every
+cell, at the $\sqrt{T}$ rate where the surface is regular, and every cell
+converges in all 100 replications, including $K = 5$ (33 parameters),
+a dimension at which the pre-1.7-0 natural-space search produced no usable
+replication at all. Median RMSE *falls* as $K$ grows (each added series is
+one more observation on the same latent regime path), which turns the
+conjecture that regime-switching correlation models pay off increasingly
+with dimension into a measured result. Finally, in the three-regime TVTP
+cells a fraction of replications reach the $\pm 10$ coefficient bound at
+small $T$, the classical separation problem of multinomial-logit
+transitions when some transitions are observed only a handful of times, and that fraction falls from 75% to 36% of replications as $T$ doubles;
+the study's usable counts report it transparently.
+
+# Empirical illustration {#sec:empirical}
+
+The main application uses the `ff5ind` data set shipped with the package:
+daily value-weighted returns (percent) of five Fama-French industry
+portfolios, Manufacturing, Energy, High Tech, Health, Utilities
+[@fama1997industry], together with the MCCC index (monthly Aggregate,
+forward-filled across trading days) and the CBOE VIX, aligned on
+$T = 5155$ U.S. trading days from 2005-01-03 to 2025-06-30. The two
+candidate transition covariates are nearly orthogonal in this window,
+which lets the data separate two mechanisms: market fear (VIX) and climate
+attention (MCCC).
+
+Everything below is out-of-sample in the strict sense: the GARCH
+pre-filter, the covariate scaling, and all regime-model parameters are
+estimated on the first 70% of the sample ($T_{\text{train}} = 3608$ days,
+2005-2019); the remaining 30% ($T_{\text{test}} = 1547$ days, 2019-2025,
+spanning the COVID crash and the 2022 tightening cycle) is used only for
+evaluation, with out-of-sample correlations weighted by *filtered* (not
+smoothed) probabilities so no future information enters.
+
+## Data and preprocessing
+
+```{r ff5-data}
+data("ff5ind")
+industries <- c("Manuf", "Enrgy", "HiTec", "Hlth", "Utils")
+ret   <- as.matrix(ff5ind[, industries])
+dates <- ff5ind$DATE
+n     <- nrow(ret)
+cut   <- round(0.7 * n)                        # matches the estimators' split
+c(train_end = format(dates[cut]), test_start = format(dates[cut + 1]))
+
+ff5 <- garch_filter(ret, cut)                  # train-window GARCH parameters
+z <- ff5$z; s <- ff5$s
+
+std_train <- function(x) (x - mean(x[1:cut])) / sd(x[1:cut])
+X_mccc <- cbind(intercept = 1, MCCC   = std_train(ff5ind$mccc))
+X_vix  <- cbind(intercept = 1, logVIX = std_train(log(ff5ind$vix)))
+X_both <- cbind(X_mccc, logVIX = X_vix[, "logVIX"])
+round(cor(X_mccc[, "MCCC"], X_vix[, "logVIX"]), 3)   # near-orthogonal covariates
+```
+
+## Estimation and model selection
+
+We estimate nine specifications with the same call, all with
+`out_of_sample = TRUE` and the multi-start protocol; per-model wall-clock
+times are collected for the timing table below.
+
+```{r ff5-fits}
+ctrl <- list(n_starts = 4, cores = 14, compute_se = FALSE)
+fit1 <- function(method, N, X = NULL) {
+  t0 <- Sys.time()
+  f  <- rsdc_estimate(method, residuals = z, N = N, X = X,
+                      out_of_sample = TRUE, control = ctrl)
+  attr(f, "minutes") <- as.numeric(Sys.time() - t0, units = "mins")
+  f
+}
+fits <- list(
+  "const"      = fit1("const", 1),
+  "noX(N=2)"   = fit1("noX", 2),
+  "noX(N=3)"   = fit1("noX", 3),
+  "tvtp2-MCCC" = fit1("tvtp", 2, X_mccc),
+  "tvtp2-VIX"  = fit1("tvtp", 2, X_vix),
+  "tvtp2-both" = fit1("tvtp", 2, X_both),
+  "tvtp3-MCCC" = fit1("tvtp", 3, X_mccc),
+  "tvtp3-VIX"  = fit1("tvtp", 3, X_vix),
+  "tvtp3-both" = fit1("tvtp", 3, X_both))
+```
+
+```{r ff5-comparison, cache = FALSE}
+comparison <- data.frame(
+  model    = names(fits),
+  logLik   = sapply(fits, function(f) as.numeric(logLik(f))),
+  npar     = sapply(fits, function(f) f$npar),
+  AIC      = sapply(fits, AIC),
+  BIC      = sapply(fits, BIC),
+  logLikOOS = sapply(fits, function(f) f$log_likelihood_oos),
+  row.names = NULL)
+knitr::kable(comparison, digits = 1, caption = sprintf(
+  "Model comparison, five Fama-French industries. Training window
+   2005-%s (T = %d): log-likelihood, parameters, AIC, BIC. Last column:
+   predictive log-likelihood on the out-of-sample window (T = %d), computed with
+   training-window parameters and filtered probabilities.",
+  format(dates[cut], "%Y"), cut, n - cut))
+```
+
+Three regimes dominate two on every criterion, and every switching model
+dominates the constant baseline. The criteria disagree, however, on the
+transition specification: the AIC selects the richest model (three regimes,
+both covariates), the BIC, penalizing harder, prefers the
+VIX-only variant, and the out-of-sample predictive log-likelihood is best for
+the fixed-transition `noX(N=3)` model, with `tvtp3-both` a close second
+(a 14 log-point gap over 1547 days). In-sample, the covariates add
+substantial information about transitions; that edge does not translate
+into better prediction on this particular hold-out, which opens with the
+COVID crash, a regime entry unlike anything in the training window. We
+retain `tvtp3-both`, the AIC choice, and the specification that lets us
+study the covariate effects, as the working model, and report the
+fixed-transition alternative alongside it in the portfolio evaluation.
+Because the single-covariate models are nested in the two-covariate model,
+likelihood-ratio tests need only base R:
+
+```{r ff5-lr, cache = FALSE}
+ll <- setNames(comparison$logLik, comparison$model)
+np <- setNames(comparison$npar,   comparison$model)
+lr <- function(big, small) {
+  stat <- 2 * (ll[[big]] - ll[[small]]); df <- np[[big]] - np[[small]]
+  c(LR = round(stat, 1), df = df,
+    p = signif(pchisq(stat, df, lower.tail = FALSE), 2))
+}
+rbind("VIX adds to MCCC (N = 3)"  = lr("tvtp3-both", "tvtp3-MCCC"),
+      "MCCC adds to VIX (N = 3)"  = lr("tvtp3-both", "tvtp3-VIX"),
+      "three regimes vs two"      = lr("tvtp3-both", "tvtp2-both"))
+```
+
+The two covariates contribute asymmetrically on the training window: the
+VIX adds overwhelming information given MCCC (LR = 100.7), while MCCC adds
+significant but modest information given the VIX (LR = 14.6, p = 0.02).
+Their near-orthogonality still matters, whatever MCCC contributes is not
+market fear in disguise, and the bootstrap below shows that several
+individual MCCC slopes are precisely estimated. (The three-vs-two-regime statistic is
+indicative only, as regime-count tests face unidentified parameters under
+the null; AIC, BIC and the out-of-sample likelihood all point the same way.) As
+a consistency check, every nested pair in Table \@ref(tab:ff5-comparison)
+satisfies the required likelihood inequality.
+
+## Inference on the retained model
+
+For inference we re-estimate the retained specification on the training
+window (a warm start from the fit above, so no global search is repeated)
+and run the parametric bootstrap.
+
+```{r ff5-boot}
+fit_ret <- rsdc_estimate("tvtp", residuals = z[1:cut, ], N = 3,
+                         X = X_both[1:cut, ],
+                         control = list(start = fits[["tvtp3-both"]]$par,
+                                        compute_se = FALSE))
+set.seed(123)
+bs <- rsdc_bootstrap(fit_ret, B = 199, X = X_both[1:cut, ], seed = 123,
+                     cores = 14)
+```
+
+The fitted object also carries observed-information standard errors for
+every coefficient, delta-method standard errors for the implied transition
+matrix at the covariate means, and regime diagnostics (expected durations,
+ergodic distribution); the full `summary()` output is reported in the
+Appendix.
+
+```{r ff5-se, results = "hide"}
+fit_se <- rsdc_estimate("tvtp", residuals = z[1:cut, ], N = 3,
+                        X = X_both[1:cut, ],
+                        control = list(start = fit_ret$par))
+summary(fit_se)
+```
+
+The two inference routes agree: the observed-information standard errors
+track the bootstrap ones closely (median ratio 1.09), and the two methods
+classify 11 of the 12 covariate slopes identically at the 5 percent level,
+the exception being the borderline calm-persistence MCCC slope. We keep the
+bootstrap intervals as the headline, since several transition probabilities
+sit near their bounds, where the quadratic approximation behind the
+observed information is least reliable.
+
+```{r ff5-boot-table, cache = FALSE}
+ci <- bs$ci
+rows <- c(grep("x2]", rownames(ci), fixed = TRUE),
+          grep("x3]", rownames(ci), fixed = TRUE))
+tab <- cbind(ci[rows, , drop = FALSE], se = bs$se[rows])
+rownames(tab) <- sub("x2]", "MCCC]", sub("x3]", "logVIX]", rownames(tab)))
+star <- ifelse(tab[, 1] * tab[, 2] > 0, "*", "")
+knitr::kable(cbind(as.data.frame(round(tab, 3)), ` ` = star), caption = sprintf(
+  "Percentile 95 percent bootstrap intervals for the MCCC and log-VIX transition
+   slopes of the retained model (B = %d parametric replicates on the
+   training window; coefficients are softmax logits with the crisis regime
+   as reference; * = interval excludes zero).", bs$B))
+```
+
+Figures \@ref(fig:ff5-pers-vix) and \@ref(fig:ff5-pers-mccc) turn the
+estimated coefficients into pictures; each curve varies one covariate with
+the other held at its training mean. Against log-VIX, fear empties the
+calm state and locks in the high-correlation ones: calm persistence falls
+from about 0.7 in quiet markets to essentially zero at high VIX, while the
+crisis regime's stay probability climbs from below 0.5 to near certainty.
+Under stress the system does not merely visit the high-correlation states,
+it stays there. Against MCCC, attention works mostly through the calm
+state, whose persistence roughly quadruples across the observed range, so
+durable low-correlation spells require high climate attention; crisis
+persistence also rises somewhat. The two covariates thus act on different
+margins of the transition matrix, consistent with each carrying its own
+information in the likelihood-ratio tests. We read all of these as
+conditional associations estimated from one sample, not causal effects.
+
+```{r ff5-pers-fun}
+# Stay probability pi_ii(x) from the softmax rows of the estimated beta
+# (row i: two destination blocks of (intercept, MCCC, logVIX); ref = crisis)
+stay_prob <- function(beta, i, x_mccc, x_vix) {
+  x <- c(1, x_mccc, x_vix)
+  l1 <- sum(x * beta[i, 1:3]); l2 <- sum(x * beta[i, 4:6])
+  e <- exp(c(l1, l2, 0) - max(l1, l2, 0))
+  (e / sum(e))[min(i, 3)]
+}
+persistence_fig <- function(vary = c("vix", "mccc")) {
+  vary <- match.arg(vary)
+  obs <- if (vary == "vix") X_vix[1:cut, 2] else X_mccc[1:cut, 2]
+  grid <- seq(quantile(obs, 0.005), quantile(obs, 0.995), length.out = 200)
+  B <- fit_ret$beta
+  d <- do.call(rbind, lapply(1:3, function(i) data.frame(
+    x = grid, regime = c("Calm", "Normal", "Crisis")[i],
+    p = vapply(grid, function(g)
+      if (vary == "vix") stay_prob(B, i, 0, g) else stay_prob(B, i, g, 0),
+      0))))
+  d$regime <- factor(d$regime, levels = c("Calm", "Normal", "Crisis"))
+  lab <- d[ave(d$x, d$regime, FUN = max) == d$x, ]
+  vj <- c(Calm = 0.5, Normal = 1.6, Crisis = -0.7)
+  lab$vjust <- vj[as.character(lab$regime)]
+  xlab_txt <- if (vary == "vix") "log VIX (standardized)" else
+                                 "MCCC (standardized)"
+  ggplot(d, aes(x, p, colour = regime)) +
+    geom_line(linewidth = 0.9) +
+    geom_text(data = lab, aes(label = regime, vjust = vjust),
+              hjust = -0.15, fontface = "bold", size = 3.4,
+              show.legend = FALSE) +
+    geom_rug(data = data.frame(x = obs), aes(x = x), inherit.aes = FALSE,
+             sides = "b", alpha = 0.15, length = unit(0.03, "npc")) +
+    scale_colour_manual(values = c("#2166ac", "#e8a33d", "#d1541e"),
+                        guide = "none") +
+    scale_x_continuous(expand = expansion(mult = c(0.02, 0.12))) +
+    labs(y = "P(stay in regime)", x = xlab_txt) +
+    thm + theme(axis.title.x = element_text())
+}
+```
+
+```{r ff5-pers-vix, out.width = "100%", fig.height = 3.9, fig.cap = "Regime persistence as a function of log-VIX, MCCC held at its training mean; TVTP(N = 3), training-window estimates. Ticks along the x-axis: observed log-VIX distribution."}
+persistence_fig("vix")
+```
+
+```{r ff5-pers-mccc, out.width = "100%", fig.height = 3.9, fig.cap = "Regime persistence as a function of MCCC, log-VIX held at its training mean; TVTP(N = 3), training-window estimates. Ticks along the x-axis: observed MCCC distribution."}
+persistence_fig("mccc")
+```
+
+Parameter uncertainty can also be propagated into the correlation path
+itself. Figure \@ref(fig:ff5-band-fig) shows the 95 percent band produced
+by `rsdc_corr_bands()`: parameter vectors are drawn from the estimated
+sampling distribution of the training-window fit, the filter is rerun for
+each draw over the full sample, and pointwise quantiles are formed; the
+out-of-sample segment is shown for one economically interpretable pair,
+old-economy Energy against new-economy HiTec. The band is tight inside
+persistent regimes and widens sharply around regime switches, where
+classification uncertainty dominates parameter uncertainty.
+
+```{r ff5-bands}
+bands <- rsdc_corr_bands(fit_se, residuals = z, X = X_both,
+                         B = 200, seed = 123)
+```
+
+```{r ff5-band-fig, out.width = "100%", fig.height = 3.4, fig.cap = "Predicted Energy-HiTec correlation with a 95 percent parameter-uncertainty band (B = 200 draws from the training-window sampling distribution), out-of-sample segment."}
+pair_names <- apply(utils::combn(industries, 2), 2, paste, collapse = "-")
+b <- bands[[which(pair_names == "Enrgy-HiTec")]]
+keep_oos <- (cut + 1):n
+db <- data.frame(date = dates[keep_oos], fit = b[keep_oos, "fit"],
+                 lo = b[keep_oos, "lower"], hi = b[keep_oos, "upper"])
+ggplot(db, aes(date, fit)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "#1f5fa8", alpha = 0.20) +
+  geom_line(colour = "#1f5fa8", linewidth = 0.35) +
+  labs(y = "Correlation (Enrgy-HiTec)") + thm
+```
+
+## Regimes and the out-of-sample correlation path
+
+```{r ff5-forecast}
+fc <- rsdc_forecast("tvtp", N = 3, residuals = z, X = X_both,
+                    final_params = fits[["tvtp3-both"]], sigma_matrix = s,
+                    value_cols = industries, out_of_sample = TRUE)
+oos_dates <- dates[(cut + 1):n]
+mean_corr_oos <- rowMeans(fc$predicted_correlations)
+```
+
+```{r ff5-smoothfig, echo = FALSE, out.width = "100%", fig.height = 5.4, fig.cap = "Smoothed regime probabilities of the retained model on the training window (top three panels; regimes ordered by mean correlation) and the mean predicted correlation on the out-of-sample window (bottom; filtered weights, 21-day moving average). The dashed line marks the train/test split."}
+sm <- fit_ret$smoothed_probs
+regime_means <- rowMeans(fit_ret$correlations)
+labs <- sprintf("P(%s (rho~%.2f))", c("Calm", "Normal", "Crisis"), regime_means)
+long <- data.frame(
+  date = rep(dates[1:cut], 3),
+  p    = as.vector(t(sm)),
+  regime = factor(rep(labs, each = cut), levels = labs))
+g_top <- ggplot(long, aes(date, p, colour = regime)) +
+  geom_line(linewidth = 0.25) +
+  facet_wrap(~regime, ncol = 1) +
+  scale_colour_manual(values = c("#2166ac", "#e8a33d", "#d1541e"), guide = "none") +
+  scale_y_continuous(breaks = c(0, 0.5, 1)) + labs(y = "Probability") + thm
+d_oos <- data.frame(
+  date = oos_dates,
+  ma = as.numeric(stats::filter(mean_corr_oos, rep(1/21, 21), sides = 2)))
+g_bot <- ggplot(d_oos, aes(date, ma)) +
+  geom_line(colour = "#1f5fa8", linewidth = 0.5, na.rm = TRUE) +
+  geom_vline(xintercept = as.numeric(dates[cut]), linetype = 2, colour = "grey55") +
+  labs(y = "Mean corr. (OOS)") + thm
+gridExtra::grid.arrange(g_top, g_bot, ncol = 1, heights = c(2.4, 1))
+```
+
+On the training window the three regimes read as calm, normal and crisis
+states (mean correlations `r paste(round(regime_means, 2), collapse = " / ")`),
+with the 2008-2009 and 2010-2012 episodes classified as crisis spells.
+Out of sample, the filtered mean-correlation path rises sharply in March
+2020 and again through 2022, periods the model has never seen, before easing over 2023-2025.
+
+## Portfolio evaluation on the out-of-sample window
+
+The out-of-sample covariances $\Sigma_t = D_t R_t D_t$ (training-window
+GARCH parameters around filtered correlations) feed the long-only
+minimum-variance and maximum-diversification optimizers, evaluated with
+`lag = TRUE`: weights formed at $t-1$ earn the period-$t$ return, and
+since parameters, covariate scaling and volatility filters all come from
+the training window, the backtest is look-ahead-free in the strict sense.
+
+```{r ff5-portfolio}
+ret_oos <- ret[(cut + 1):n, ]
+lagged_ret <- function(W) rowSums(rbind(NA, W[-nrow(W), ]) * ret_oos)
+pf_pair <- function(fcst) {
+  mv <- rsdc_minvar(sigma_matrix = fcst$sigma_matrix, value_cols = industries,
+                    predicted_corr = fcst$predicted_correlations, y = ret_oos,
+                    long_only = TRUE, lag = TRUE)
+  md <- rsdc_maxdiv(sigma_matrix = fcst$sigma_matrix, value_cols = industries,
+                    predicted_corr = fcst$predicted_correlations, y = ret_oos,
+                    long_only = TRUE, lag = TRUE)
+  list(mv = lagged_ret(mv$weights), md = lagged_ret(md$weights))
+}
+p_tvtp <- pf_pair(fc)
+fc_noX <- rsdc_forecast("noX", N = 3, residuals = z,
+                        final_params = fits[["noX(N=3)"]], sigma_matrix = s,
+                        value_cols = industries, out_of_sample = TRUE)
+p_noX <- pf_pair(fc_noX)
+pf <- data.frame(`minvar (tvtp3-both)` = p_tvtp$mv,
+                 `minvar (noX3)`       = p_noX$mv,
+                 `maxdiv (tvtp3-both)` = p_tvtp$md,
+                 equal = rowMeans(ret_oos), check.names = FALSE)[-1, ]
+```
+
+```{r ff5-pf-table, cache = FALSE}
+pf_stats <- t(sapply(pf, function(r) {
+  vol <- sd(r) * sqrt(252); ret_a <- mean(r) * 252
+  cum <- cumprod(1 + r / 100)
+  mdd <- -100 * max(1 - cum / cummax(cum))
+  c(`vol (%)` = vol, `return (%)` = ret_a,
+    `Sharpe` = ret_a / vol, `max DD (%)` = mdd)
+}))
+knitr::kable(round(pf_stats, 3), caption = sprintf(
+  "Out-of-sample portfolio evaluation (%s to %s, %d days): annualized volatility,
+   return and Sharpe ratio of the long-only strategies, minimum variance
+   under the retained TVTP model and under the fixed-transition noX(N=3)
+   alternative, maximum diversification under the retained model, against
+   the equal-weight benchmark. Weights at t-1 earn the t return; all
+   parameters are training-window estimates.",
+  format(oos_dates[2]), format(max(oos_dates)), nrow(pf)))
+```
+
+```{r ff5-pf-fig, echo = FALSE, out.width = "100%", fig.height = 3.6, fig.cap = "Cumulative value of the strategies on the out-of-sample window (log scale)."}
+cum <- data.frame(
+  date = rep(oos_dates[-1], ncol(pf)),
+  value = as.vector(apply(pf, 2, function(r) cumprod(1 + r / 100))),
+  strategy = factor(rep(colnames(pf), each = nrow(pf)), levels = colnames(pf)))
+ggplot(cum, aes(date, value, colour = strategy)) +
+  geom_line(linewidth = 0.5) + scale_y_log10() +
+  scale_colour_manual(values = c("#1f5fa8", "#7bb3e0", "#e8a33d", "grey45"),
+                      name = NULL) +
+  labs(y = "Cumulative value (log scale)") + thm +
+  theme(legend.position = "bottom")
+```
+
+Both regime-based minimum-variance portfolios deliver a markedly lower
+realized volatility than the equal-weight benchmark on data none of their
+inputs have seen, at $K = 5$, where the full correlation matrix drives
+the weights, and the two variants are nearly indistinguishable, so the
+portfolio gain comes from the regime structure itself rather than from the
+covariates. The volatility reduction is bought with lower average returns:
+Sharpe ratios end up close to the benchmark's, slightly below it for the
+minimum-variance portfolios. Minimum variance achieves exactly its stated
+objective, no more.
+
+## Timing
+
+```{r ff5-timing, cache = FALSE}
+timing <- data.frame(
+  model   = names(fits),
+  npar    = sapply(fits, function(f) f$npar),
+  minutes = round(sapply(fits, function(f) attr(f, "minutes")), 1),
+  row.names = NULL)
+knitr::kable(timing, caption = sprintf(
+  "Wall-clock estimation time per specification (four independent
+   searches per fit on %d cores; T = %d training observations, K = %d). The C++
+   filter evaluates one likelihood in about 2 ms at this sample size.",
+  ctrl$cores, cut, ncol(z)))
+```
+
+Estimation cost is driven by the number of parameters through the global
+stage's population size; the multi-start protocol runs its searches in
+parallel, so its wall-clock cost is close to that of a single search.
+
+# Conclusion
+
+The \CRANpkg{RSDC} package estimates regime-switching correlation
+models with constant, fixed-transition and covariate-driven transition
+dynamics, for any number of regimes and, since version 1.7-0, in cross-
+sectional dimensions where box-constrained search was previously
+infeasible, the global stage operates in a partial-correlation space
+where every candidate is a valid model [@joe2006generating]. A shipped
+Monte Carlo study documents parameter recovery across all specifications
+and shows accuracy *improving* with the cross-section; a five-industry
+out-of-sample application favors three regimes on every criterion; within
+the three-regime class, in-sample criteria and likelihood-ratio tests
+support transitions driven by two nearly orthogonal indicators, market
+fear associated with entries into the high-correlation regime, climate
+attention predominantly with staying out of it, while the out-of-sample
+predictive likelihood ranks the fixed-transition variant marginally ahead,
+a reminder that in-sample transition fit need not convert into forecast
+gains. The regime-based minimum-variance portfolios attain the lowest
+out-of-sample volatility among the strategies considered, with or without
+covariates.
+
+Some limitations should be kept in mind. Regime labels rest on the
+ascending-correlation ordering; all results are conditional on the
+univariate GARCH pre-filter; TVTP coefficients can reach their bounds in
+small samples when some transitions are rarely observed (the separation
+issue quantified in the validation study); and the empirical exercise is a
+software illustration on one asset universe, not a climate-finance study.
+Within those bounds, the package provides a reproducible pipeline from
+standardized residuals to regime-aware covariance forecasts and portfolio
+weights, driven by data shipped with the package.
+
+# Appendix: summary of the retained model {-}
+
+The full `summary()` of the retained TVTP($N = 3$) model, estimated on the
+training window, reports the softmax coefficients with observed-information
+standard errors, the implied transition matrix at the covariate means with
+delta-method standard errors, and per-regime diagnostics (stay
+probability, expected duration, ergodic probability). The coefficient
+naming follows `b[g<from>,c<softmax column>,x<covariate>]`, with $x_1$ the
+intercept, $x_2$ the MCCC and $x_3$ the log-VIX.
+
+\footnotesize
+
+```{r ff5-se-appendix, echo = FALSE}
+summary(fit_se)
+```
+
+\normalsize
+
+# Computational details {-}
+
+Results were obtained with \CRANpkg{RSDC} version
+`r as.character(utils::packageVersion("RSDC"))`, using
+\CRANpkg{rugarch} for GJR-GARCH filtering, \CRANpkg{DEoptim} for
+the global stage, and \CRANpkg{quadprog} / \CRANpkg{Rsolnp} for
+the portfolio optimizers. All computations use the default estimation seed
+(123) and are reproducible from the packaged `greenbrown`, `mccc` and
+`ff5ind` data sets.
+
+# Acknowledgments {-}
+
+We gratefully acknowledge financial support from the Fonds de recherche
+AMF-GIRIF and the Natural Sciences and Engineering Research Council of
+Canada (grant RGPIN-2022-03767).
+
