@@ -24,3 +24,4 @@
 ^vignettes/RSDC\.log$
 ^vignettes/RSDC\.R$
 ^vignettes/RJwrapper\.log$
+^vignettes/.*\.pdf$

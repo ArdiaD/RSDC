@@ -10,8 +10,10 @@
 #' \eqn{K(K-1)/2} pairwise correlations drawn uniformly in \eqn{(-1,1)} is
 #' almost never a valid (positive-definite) correlation matrix, so the random
 #' initial population contains no feasible point. \code{rsdc_starts} sidesteps
-#' this by initialising each regime at an \emph{empirical} correlation matrix —
-#' positive definite by construction:
+#' this by initialising each regime at an \emph{empirical} correlation matrix,
+#' which is positive semi-definite by construction and positive definite
+#' whenever the group has enough non-collinear observations (starts that are not
+#' usable are filtered out by the feasibility check below):
 #' \enumerate{
 #'   \item compute the rolling mean pairwise correlation over \code{window}
 #'         observations;

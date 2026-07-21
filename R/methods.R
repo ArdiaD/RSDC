@@ -214,9 +214,11 @@ logLik.rsdc_fit <- function(object, ...) {
 vcov.rsdc_fit <- function(object, type = c("hessian", "opg", "sandwich", "bootstrap"), ...) {
   type <- match.arg(type)
   if (type == "bootstrap") {
-    dots <- list(...)
-    B    <- if (!is.null(dots$B)) dots$B else 199L
-    return(rsdc_bootstrap(object, B = B, X = dots$X, seed = dots$seed)$vcov)
+    dots  <- list(...)
+    B     <- if (!is.null(dots$B)) dots$B else 199L
+    cores <- if (!is.null(dots$cores)) dots$cores else 1
+    return(rsdc_bootstrap(object, B = B, X = dots$X, seed = dots$seed,
+                          cores = cores)$vcov)
   }
   if (is.null(object$vcov))
     stop("No variance-covariance available (Hessian singular/unavailable). ",

@@ -36,9 +36,7 @@ Suggests:
     testthat (>= 3.0.0),
     quadprog,
     Rsolnp,
-    ggplot2,
-    gridExtra,
-    rugarch
+    ggplot2
 Config/testthat/edition: 3
 RdMacros:
     Rdpack

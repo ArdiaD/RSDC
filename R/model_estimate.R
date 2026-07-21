@@ -560,8 +560,8 @@ f_optim_noX <- function(N, residuals, out_of_sample = FALSE, control = list()) {
 f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
   stopifnot(is.matrix(residuals))
 
-  con <- list(seed = 123, do_trace = FALSE, itermax = 500, maxit = 1000,
-              compute_se = TRUE, start = NULL)
+  con <- list(seed = 123, do_trace = FALSE, itermax = 500, NP = NULL,
+              steptol = 50, maxit = 1000, compute_se = TRUE, start = NULL)
   con[names(control)] <- control
 
   K <- ncol(residuals)
@@ -610,7 +610,7 @@ f_optim_const <- function(residuals, out_of_sample = FALSE, control = list()) {
       function(par) neg_loglik_const(par, y = y_is, K = K),
       method = "const", K = K, N = 1L,
       lower = rep(-1, n_rho), upper = rep(1, n_rho),
-      con = list(itermax = con$itermax, NP = NULL, steptol = 50,
+      con = list(itermax = con$itermax, NP = con$NP, steptol = con$steptol,
                  maxit = con$maxit, do_trace = con$do_trace))
     de_best <- gs$par
   }

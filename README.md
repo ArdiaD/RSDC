@@ -43,3 +43,16 @@ Hamilton, J.D. (1989).
 [A new approach to the economic analysis of nonstationary time 
 series and the business cycle](https://doi.org/10.2307/1912559). 
 *Econometrica*, 57(2), 357–384.  
+
+## Companion article
+
+A companion manuscript (in preparation for *The R Journal*) presents the
+methodology, the estimation strategy, a Monte Carlo validation, and a strictly
+out-of-sample study of five Fama–French industry portfolios with
+regime-dependent minimum-variance and maximum-diversification allocations. It is
+developed in a separate repository, <https://github.com/ArdiaD/RSDC-paper>, and
+is fully reproducible from data shipped with this package. Use
+`citation("RSDC")` for the current reference.
+
+For a short tour of the API, see the package vignette:
+`browseVignettes("RSDC")`.

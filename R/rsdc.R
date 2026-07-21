@@ -62,8 +62,9 @@
 #' c(AIC = AIC(fit), BIC = BIC(fit))
 #' # Most likely regime path
 #' table(rsdc_viterbi(fit))
-#' # See the vignettes for the full TVTP and portfolio workflow:
-#' # browseVignettes("RSDC")
+#' # Getting-started vignette:  browseVignettes("RSDC")
+#' # The companion article (methodology + a five-industry out-of-sample study)
+#' # is developed at https://github.com/ArdiaD/RSDC-paper ; see citation("RSDC").
 #' }
 #'
 #' @useDynLib RSDC, .registration = TRUE
