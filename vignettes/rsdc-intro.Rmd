@@ -185,6 +185,7 @@ rbind(true = c(0.2, 0.8),
 ```
 
 A full Monte-Carlo study (five model variants, $M = 100$ replications,
-$T \in \{500, 1000, 2000\}$, $K \in \{2, 3, 4\}$, reporting bias/RMSE/MCSE) ships with
-the package in `inst/simulation/monte_carlo_study.R` and can be run from the package
-root with `source(system.file("simulation", "monte_carlo_study.R", package = "RSDC"))`.
+$T$ up to $2000$, $K$ up to $5$, reporting bias/RMSE and the value of the
+multi-start protocol) ships with the package in
+`inst/simulation/mc_recovery_study.R` and can be run from the package
+root with `source(system.file("simulation", "mc_recovery_study.R", package = "RSDC"))`.

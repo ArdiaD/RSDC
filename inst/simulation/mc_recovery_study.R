@@ -43,7 +43,7 @@
 # Env overrides: MC_CORES (default: available cores - 2), MC_M (default 100),
 #                MC_SMOKE=1 (tiny grids, syntax/pipeline check only).
 #
-# Source from the package root: source("inst/simulation/monte_carlo_study.R")
+# Source from the package root: source("inst/simulation/mc_recovery_study.R")
 # =============================================================================
 
 if (requireNamespace("RSDC", quietly = TRUE)) {
