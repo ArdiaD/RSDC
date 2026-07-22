@@ -1,4 +1,10 @@
 # Changes in Version 1.7-0 (DA,BS,RN)
+- Windows build fix: `src/Makevars`/`src/Makevars.win` now link BLAS/LAPACK
+  explicitly (`$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)`), as required by
+  RcppArmadillo. Without it, `R CMD INSTALL` on Windows failed at the link
+  step with undefined references (`dgemv_`, `dgemm_`, `dsyev_`, ...); macOS
+  linkers tolerate the undefined symbols, which is why the omission was
+  invisible on the development machine.
 - The package article (methodology, a strictly out-of-sample five-industry
   study, and a Monte Carlo validation) is developed in a separate repository,
   <https://github.com/ArdiaD/RSDC-paper>, and is reproducible from data shipped
