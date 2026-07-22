@@ -33,13 +33,14 @@
 # with dynamic scheduling (mc.preschedule = FALSE) - long tvtp N=3 tasks
 # interleave with fast const ones, no per-cell barriers, no idle tails.
 # Each task self-seeds (set.seed(base_seed + m)): results are bit-identical
-# for any worker count. Forking: macOS/Linux (serial on Windows).
+# for any worker count. Backend: forked mclapply on macOS/Linux, a PSOCK
+# cluster on Windows.
 #
 # Outputs: PNG plots -> inst/simulation/plots/
 #          CSV summaries -> inst/simulation/results/
 #          RDS bundle -> inst/simulation/results/monte_carlo_results.rds
 #
-# Env overrides: MC_CORES (default 14), MC_M (default 100),
+# Env overrides: MC_CORES (default: available cores - 2), MC_M (default 100),
 #                MC_SMOKE=1 (tiny grids, syntax/pipeline check only).
 #
 # Source from the package root: source("inst/simulation/monte_carlo_study.R")
@@ -68,7 +69,8 @@ T5_grid  <- if (SMOKE) 300L else c(1000L, 2000L)         # case 5 (local; never
 K4_grid  <- if (SMOKE) 2L   else c(2L, 3L, 5L)           # case-4 K sweep
 MC_CORES <- {
   env <- suppressWarnings(as.integer(Sys.getenv("MC_CORES", "")))
-  if (!is.na(env) && env >= 1L) env else 14L
+  if (!is.na(env) && env >= 1L) env
+  else max(1L, parallel::detectCores() - 2L)
 }
 CTRL <- list(compute_se = FALSE)     # SEs play no role in bias/RMSE
 # Second arm for the multimodal N = 3 cases (4 and 5): the documented
@@ -318,13 +320,27 @@ cat(sprintf("Monte Carlo: RSDC %s | %d cells x M=%d -> %d tasks | cores=%d%s\n",
             nrow(tasks), MC_CORES, if (SMOKE) " [SMOKE]" else ""))
 
 t0_all <- proc.time()["elapsed"]
-raw <- parallel::mclapply(seq_len(nrow(tasks)), function(i) {
+run_task <- function(i) {
   tk <- tasks[i, ]
   out <- tryCatch(WORKERS[[tk$case]](tk$m, tk$T, tk$K,
                                      ctrl = if (tk$arm == "ns4") CTRL_NS4 else CTRL),
                   error = function(e) FAIL[[tk$case]])
   cbind(tk, out, row.names = NULL)
-}, mc.cores = MC_CORES, mc.preschedule = FALSE)
+}
+raw <- if (.Platform$OS.type == "unix") {
+  parallel::mclapply(seq_len(nrow(tasks)), run_task,
+                     mc.cores = MC_CORES, mc.preschedule = FALSE)
+} else {
+  # Windows: PSOCK cluster with load balancing; per-task seeding makes the
+  # results identical to the forked path, in the same order.
+  cl <- parallel::makeCluster(MC_CORES)
+  out <- tryCatch({
+    parallel::clusterEvalQ(cl, suppressMessages(library("RSDC")))
+    parallel::clusterExport(cl, ls(envir = .GlobalEnv), envir = .GlobalEnv)
+    parallel::parLapplyLB(cl, seq_len(nrow(tasks)), run_task)
+  }, finally = parallel::stopCluster(cl))
+  out
+}
 elapsed_all <- proc.time()["elapsed"] - t0_all
 ok_runs <- vapply(raw, is.data.frame, logical(1L))
 if (any(!ok_runs))       # crashed workers (fork kill etc.): mark as failed
