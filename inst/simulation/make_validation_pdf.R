@@ -1,5 +1,5 @@
 # Regenerate montecarlo_validation.pdf from the outputs of
-# mc_recovery_study.R (CSV summaries + RDS bundle in results/).
+# run_mc_recovery_study.R (CSV summaries + RDS bundle in results/).
 # Emits montecarlo_validation.tex and compiles it with tinytex.
 # Run from the package root: source("inst/simulation/make_validation_pdf.R")
 
