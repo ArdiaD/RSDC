@@ -54,9 +54,9 @@
 
 \item{digits}{Number of significant digits for printing.}
 
-\item{...}{Further arguments passed to methods (\code{vcov} forwards \code{B}
-and \code{seed} to \code{\link{rsdc_bootstrap}} when \code{type = "bootstrap"};
-otherwise unused).}
+\item{...}{Further arguments passed to methods (\code{vcov} forwards \code{B},
+\code{X}, \code{seed}, and \code{cores} to \code{\link{rsdc_bootstrap}} when
+\code{type = "bootstrap"}; otherwise unused).}
 
 \item{type}{Covariance estimator: one of \code{"hessian"}, \code{"opg"},
 \code{"sandwich"} (numerical) or \code{"bootstrap"} (simulation-based).}
@@ -119,8 +119,8 @@ is described in the \emph{Functions} section below.
 observed information), \code{"opg"} (outer product of gradients) and
 \code{"sandwich"} (QML/robust \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}); the
 \emph{simulation-based} estimator is \code{"bootstrap"}, which calls
-\code{\link{rsdc_bootstrap}} (pass \code{B} and \code{seed} through
-\code{...}). The bootstrap is recomputed on each call.
+\code{\link{rsdc_bootstrap}} (pass \code{B}, \code{X}, \code{seed}, and
+\code{cores} through \code{...}). The bootstrap is recomputed on each call.
 
 \item \code{confint(rsdc_fit)}: Wald confidence intervals from the chosen covariance
 (numerical or \code{"bootstrap"}). For bootstrap \emph{percentile} intervals

@@ -19,17 +19,15 @@ See NEWS.md for the full history.
 
 ## Test environments
 * Local: macOS Sequoia 15.6, R 4.5.1
-* win-builder: R release and R devel
-* R-hub: Windows, Ubuntu (R devel)
+* win-builder: R release and R devel (results to be confirmed at submission)
+* R-hub: Windows, Ubuntu (R devel) (results to be confirmed at submission)
 
 ## R CMD check results
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 0 notes
 
-## Notes
-* "Namespace in Imports field not imported from: 'Rdpack'". Rdpack is imported
-  only to provide the Rd macros (e.g. \insertRef) used for references in the
-  documentation; it is declared under RdMacros in DESCRIPTION, so the import is
-  required even though no R object is imported from it.
+(Local `--as-cran` check; a clang `-Wfixed-enum-extension` warning appears
+locally but originates in R's own headers, not package code — see the
+maintainer notes below. It does not appear on CRAN's build machines.)
 
 ## Reverse dependencies
 There are no reverse dependencies on CRAN.

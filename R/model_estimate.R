@@ -843,9 +843,9 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
   # is refined by the local optimiser (the global search is skipped) and the
   # highest-likelihood fit is kept. control$cores parallelises whichever
   # multi-start form is active; the backends never see it there (no nested
-  # parallelism). For a plain single fit, cores is forwarded to the backends,
-  # where cores > 1 enables DEoptim's parallel evaluation (parallelType = 1),
-  # preserving the pre-1.6-0 behaviour.
+  # parallelism). Since 1.7-0 a plain single fit ignores cores: parallelism
+  # lives across the independent searches of the multi-start forms, not
+  # inside DEoptim (see NEWS).
   n_starts <- if (!is.null(control$n_starts)) as.integer(control$n_starts) else 1L
   base_seed <- if (!is.null(control$seed)) control$seed else 123L
   cores <- if (!is.null(control$cores)) as.integer(control$cores) else 1L
@@ -909,7 +909,7 @@ rsdc_estimate <- function(method = c("tvtp", "noX", "const"),
     fit <- fit_once(final_ctrl)
   } else {
     fc <- control; fc$n_starts <- NULL
-    fit <- fit_once(fc)   # cores stays: backends use it for parallel DEoptim
+    fit <- fit_once(fc)   # single fit: cores is ignored since 1.7-0 (no DEoptim parallelType)
   }
 
   out <- .rsdc_finalize(fit, method = method, N = N, K = ncol(residuals), p = p_x, call = cl)

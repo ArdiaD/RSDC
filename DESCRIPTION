@@ -41,7 +41,7 @@ Config/testthat/edition: 3
 RdMacros:
     Rdpack
 Depends:
-    R (>= 3.5)
+    R (>= 3.6)
 LazyData: true
 VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0

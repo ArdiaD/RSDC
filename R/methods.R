@@ -119,9 +119,9 @@
 #' @param x,object An object of class \code{"rsdc_fit"}, as returned by
 #'   \code{\link{rsdc_estimate}}.
 #' @param digits Number of significant digits for printing.
-#' @param ... Further arguments passed to methods (\code{vcov} forwards \code{B}
-#'   and \code{seed} to \code{\link{rsdc_bootstrap}} when \code{type = "bootstrap"};
-#'   otherwise unused).
+#' @param ... Further arguments passed to methods (\code{vcov} forwards \code{B},
+#'   \code{X}, \code{seed}, and \code{cores} to \code{\link{rsdc_bootstrap}} when
+#'   \code{type = "bootstrap"}; otherwise unused).
 #'
 #' @returns \code{print} and \code{plot} return \code{x} invisibly. \code{coef},
 #'   \code{nobs}, \code{logLik}, \code{vcov} and \code{confint} return the usual
@@ -206,8 +206,8 @@ logLik.rsdc_fit <- function(object, ...) {
 #'   observed information), \code{"opg"} (outer product of gradients) and
 #'   \code{"sandwich"} (QML/robust \eqn{H^{-1} (\sum_t s_t s_t') H^{-1}}); the
 #'   \emph{simulation-based} estimator is \code{"bootstrap"}, which calls
-#'   \code{\link{rsdc_bootstrap}} (pass \code{B} and \code{seed} through
-#'   \code{...}). The bootstrap is recomputed on each call.
+#'   \code{\link{rsdc_bootstrap}} (pass \code{B}, \code{X}, \code{seed}, and
+#'   \code{cores} through \code{...}). The bootstrap is recomputed on each call.
 #' @param type Covariance estimator: one of \code{"hessian"}, \code{"opg"},
 #'   \code{"sandwich"} (numerical) or \code{"bootstrap"} (simulation-based).
 #' @exportS3Method vcov rsdc_fit
