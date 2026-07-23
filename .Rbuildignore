@@ -7,7 +7,7 @@
 ^\.github$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
-^precran\.R$
+^run_precran\.R$
 ^data-raw$
 ^src/.*\.o$
 ^src/.*\.so$

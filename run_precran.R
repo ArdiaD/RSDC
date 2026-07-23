@@ -1,7 +1,7 @@
-# precran.R — Run typical pre-CRAN checks
+# run_precran.R — Run typical pre-CRAN checks
 # Usage from the package root:
-#   Rscript precran.R
-# or source("precran.R") from an interactive session.
+#   Rscript run_precran.R
+# or source("run_precran.R") from an interactive session.
 
 message("==== Pre-CRAN preflight starting ====")
 
